@@ -1,0 +1,493 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  type AuditReport,
+  clearSampleData,
+  getAuditReports,
+  getAuditSubmissionById,
+} from "@/lib/store";
+import { useNavigate } from "@tanstack/react-router";
+import {
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  Download,
+  Eye,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+
+const PAGE_SIZE = 10;
+
+function scoreColorClass(score: number): string {
+  if (score >= 90)
+    return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0";
+  if (score >= 75)
+    return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0";
+  if (score >= 60)
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0";
+  return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0";
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 90) return "Excellent";
+  if (score >= 75) return "Good";
+  if (score >= 60) return "Needs Improvement";
+  return "Critical";
+}
+
+export default function AuditReportsPage() {
+  const navigate = useNavigate();
+  const [reports, setReports] = useState<AuditReport[]>(() =>
+    getAuditReports(),
+  );
+
+  const refresh = () => setReports(getAuditReports());
+
+  const hasSampleData = reports.some((r) => r.isSample);
+
+  const handleClearSample = () => {
+    clearSampleData();
+    refresh();
+    toast.success("Sample and test data cleared.");
+  };
+
+  const handleDownload = (report: AuditReport) => {
+    toast.success(`Report for ${report.outletName} downloaded.`);
+  };
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [filterOutlet, setFilterOutlet] = useState("all");
+  const [filterAuditor, setFilterAuditor] = useState("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+
+  // Sort
+  const [sortField, setSortField] = useState<"date" | "score">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+
+  const outletOptions = useMemo(() => {
+    return Array.from(new Set(reports.map((r) => r.outletName))).sort();
+  }, [reports]);
+
+  const auditorOptions = useMemo(() => {
+    return Array.from(new Set(reports.map((r) => r.auditorName))).sort();
+  }, [reports]);
+
+  const hasFilters =
+    search ||
+    filterOutlet !== "all" ||
+    filterAuditor !== "all" ||
+    filterDateFrom ||
+    filterDateTo;
+
+  const clearFilters = () => {
+    setSearch("");
+    setFilterOutlet("all");
+    setFilterAuditor("all");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setPage(1);
+  };
+
+  const filtered = useMemo(() => {
+    let out = [...reports];
+    if (search) {
+      const q = search.toLowerCase();
+      out = out.filter(
+        (r) =>
+          r.outletName.toLowerCase().includes(q) ||
+          r.id.toLowerCase().includes(q) ||
+          (r.submissionId &&
+            (() => {
+              const sub = getAuditSubmissionById(r.submissionId!);
+              return sub?.auditId?.toLowerCase().includes(q);
+            })()),
+      );
+    }
+    if (filterOutlet !== "all")
+      out = out.filter((r) => r.outletName === filterOutlet);
+    if (filterAuditor !== "all")
+      out = out.filter((r) => r.auditorName === filterAuditor);
+    if (filterDateFrom) out = out.filter((r) => r.date >= filterDateFrom);
+    if (filterDateTo) out = out.filter((r) => r.date <= filterDateTo);
+    out.sort((a, b) => {
+      if (sortField === "date") {
+        const diff = a.date.localeCompare(b.date);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      const diff = a.score - b.score;
+      return sortDir === "asc" ? diff : -diff;
+    });
+    return out;
+  }, [
+    reports,
+    search,
+    filterOutlet,
+    filterAuditor,
+    filterDateFrom,
+    filterDateTo,
+    sortField,
+    sortDir,
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  const handleSort = (field: "date" | "score") => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ field }: { field: "date" | "score" }) => {
+    if (sortField !== field)
+      return <ChevronDown className="w-3.5 h-3.5 opacity-30" />;
+    return sortDir === "asc" ? (
+      <ChevronUp className="w-3.5 h-3.5" />
+    ) : (
+      <ChevronDown className="w-3.5 h-3.5" />
+    );
+  };
+
+  const getAuditId = (report: AuditReport): string => {
+    if (report.submissionId) {
+      const sub = getAuditSubmissionById(report.submissionId);
+      if (sub?.auditId) return sub.auditId;
+    }
+    return report.id.slice(0, 8).toUpperCase();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="font-display font-semibold text-lg">Audit Reports</h2>
+          <p className="text-sm text-muted-foreground">
+            {reports.length} report{reports.length !== 1 ? "s" : ""} on record
+            {hasFilters && filtered.length !== reports.length && (
+              <span className="ml-1 text-primary">
+                · {filtered.length} matching
+              </span>
+            )}
+          </p>
+        </div>
+        {hasSampleData && (
+          <Button
+            variant="outline"
+            size="sm"
+            data-ocid="audit.delete_button"
+            onClick={handleClearSample}
+            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear Sample &amp; Test Data
+          </Button>
+        )}
+      </div>
+
+      {/* Filter / Search Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 items-end p-3 bg-muted/30 border rounded-lg">
+        <div className="col-span-2 md:col-span-1 relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search by outlet or audit ID…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            data-ocid="audit.search_input"
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+        <Select
+          value={filterOutlet}
+          onValueChange={(v) => {
+            setFilterOutlet(v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger
+            data-ocid="audit.outlet.select"
+            className="h-9 text-sm"
+          >
+            <SelectValue placeholder="All Outlets" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Outlets</SelectItem>
+            {outletOptions.map((o) => (
+              <SelectItem key={o} value={o}>
+                {o}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filterAuditor}
+          onValueChange={(v) => {
+            setFilterAuditor(v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger
+            data-ocid="audit.auditor.select"
+            className="h-9 text-sm"
+          >
+            <SelectValue placeholder="All Auditors" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Auditors</SelectItem>
+            {auditorOptions.map((a) => (
+              <SelectItem key={a} value={a}>
+                {a}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={filterDateFrom}
+          onChange={(e) => {
+            setFilterDateFrom(e.target.value);
+            setPage(1);
+          }}
+          data-ocid="audit.date_from.input"
+          className="h-9 text-sm"
+        />
+        <Input
+          type="date"
+          value={filterDateTo}
+          onChange={(e) => {
+            setFilterDateTo(e.target.value);
+            setPage(1);
+          }}
+          data-ocid="audit.date_to.input"
+          className="h-9 text-sm"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearFilters}
+          disabled={!hasFilters}
+          data-ocid="audit.clear_filters.button"
+          className="h-9 gap-1.5 text-muted-foreground hover:text-foreground"
+        >
+          <X className="w-3.5 h-3.5" />
+          Clear
+        </Button>
+      </div>
+
+      {/* Table */}
+      {paged.length === 0 ? (
+        <div
+          data-ocid="audit.empty_state"
+          className="flex flex-col items-center justify-center py-16 text-center border rounded-lg"
+        >
+          <ClipboardList className="w-12 h-12 text-muted-foreground/40 mb-3" />
+          <p className="font-medium text-muted-foreground">
+            {hasFilters
+              ? "No reports match your filters"
+              : "No audit reports yet"}
+          </p>
+          <p className="text-sm text-muted-foreground/70 mt-1">
+            {hasFilters
+              ? "Try adjusting or clearing the filters above."
+              : "Completed audits will appear here."}
+          </p>
+          {hasFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="mt-3 gap-1.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table data-ocid="audit.table">
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead className="font-semibold whitespace-nowrap">
+                    Audit ID
+                  </TableHead>
+                  <TableHead className="font-semibold">Outlet</TableHead>
+                  <TableHead className="font-semibold">Auditor</TableHead>
+                  <TableHead
+                    className="font-semibold cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    onClick={() => handleSort("date")}
+                  >
+                    <span className="flex items-center gap-1">
+                      Audit Date <SortIcon field="date" />
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="font-semibold cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    onClick={() => handleSort("score")}
+                  >
+                    <span className="flex items-center gap-1">
+                      Score <SortIcon field="score" />
+                    </span>
+                  </TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold text-right">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paged.map((report, idx) => (
+                  <TableRow
+                    key={report.id}
+                    data-ocid={`audit.table.row.${idx + 1}`}
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {getAuditId(report)}
+                      {report.isSample && (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 text-xs border-amber-400 text-amber-600 dark:text-amber-400"
+                        >
+                          Sample
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {report.outletName}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {report.auditorName}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {new Date(report.date).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={scoreColorClass(report.score)}>
+                        {report.score}%
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${scoreColorClass(report.score)}`}
+                      >
+                        {scoreLabel(report.score)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {report.submissionId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-ocid={`audit.table.secondary_button.${idx + 1}`}
+                            onClick={() =>
+                              navigate({
+                                to: `/audit-summary/${report.submissionId}`,
+                              })
+                            }
+                            className="h-8 w-8 hover:bg-accent"
+                            title="View Audit Summary"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          data-ocid={`audit.table.primary_button.${idx + 1}`}
+                          onClick={() => handleDownload(report)}
+                          className="h-8 w-8 hover:bg-accent"
+                          title="Download PDF Report"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
+              <p className="text-xs text-muted-foreground">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                {Math.min(currentPage * PAGE_SIZE, filtered.length)} of{" "}
+                {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-ocid="audit.pagination_prev"
+                  className="h-7 px-2 text-xs"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-ocid="audit.pagination_next"
+                  className="h-7 px-2 text-xs"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
