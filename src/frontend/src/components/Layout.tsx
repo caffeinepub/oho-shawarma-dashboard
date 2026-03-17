@@ -16,13 +16,29 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-const SIDEBAR_BG = "#361e14";
-const SIDEBAR_ACTIVE_BG = "#fdbc0c";
-const SIDEBAR_ACTIVE_TEXT = "#361e14";
-const SIDEBAR_TEXT = "#ffffff";
-const SIDEBAR_TEXT_DIM = "rgba(255,255,255,0.65)";
-const _SIDEBAR_HOVER_BG = "rgba(253,188,12,0.15)";
-const SIDEBAR_BORDER = "rgba(255,255,255,0.1)";
+// Light mode (brand)
+const LIGHT = {
+  bg: "#361e14",
+  text: "#ffffff",
+  textDim: "rgba(255,255,255,0.65)",
+  activeBg: "#fdbc0c",
+  activeText: "#361e14",
+  border: "rgba(255,255,255,0.1)",
+  avatarBg: "#fdbc0c",
+  avatarText: "#361e14",
+};
+
+// Dark mode (neutral)
+const DARK = {
+  bg: "#1e293b",
+  text: "#e2e8f0",
+  textDim: "rgba(226,232,240,0.6)",
+  activeBg: "#334155",
+  activeText: "#f1f5f9",
+  border: "rgba(255,255,255,0.08)",
+  avatarBg: "#475569",
+  avatarText: "#f1f5f9",
+};
 
 const adminNavItems = [
   {
@@ -103,6 +119,8 @@ export default function Layout() {
     return isDark;
   });
 
+  const C = dark ? DARK : LIGHT;
+
   const navItems =
     session?.role === "auditor" ? auditorNavItems : adminNavItems;
 
@@ -125,7 +143,7 @@ export default function Layout() {
       {/* Logo & Brand */}
       <div
         className="flex items-center gap-3 px-5 py-6"
-        style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}
+        style={{ borderBottom: `1px solid ${C.border}` }}
       >
         <img
           src="/assets/uploads/Logo_small-1.png"
@@ -135,14 +153,11 @@ export default function Layout() {
         <div>
           <p
             className="font-display font-bold text-sm leading-tight"
-            style={{ color: SIDEBAR_TEXT }}
+            style={{ color: C.text }}
           >
             Oho Shawarma
           </p>
-          <p
-            className="text-xs leading-tight"
-            style={{ color: SIDEBAR_TEXT_DIM }}
-          >
+          <p className="text-xs leading-tight" style={{ color: C.textDim }}>
             Auditing Dashboard
           </p>
         </div>
@@ -163,24 +178,23 @@ export default function Layout() {
               }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all"
               style={{
-                backgroundColor: active ? SIDEBAR_ACTIVE_BG : "transparent",
-                color: active ? SIDEBAR_ACTIVE_TEXT : SIDEBAR_TEXT,
+                backgroundColor: active ? C.activeBg : "transparent",
+                color: active ? C.activeText : C.text,
                 fontWeight: active ? 600 : 500,
               }}
               onMouseEnter={(e) => {
                 if (!active) {
                   (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                    SIDEBAR_ACTIVE_BG;
+                    C.activeBg;
                   (e.currentTarget as HTMLButtonElement).style.color =
-                    SIDEBAR_ACTIVE_TEXT;
+                    C.activeText;
                 }
               }}
               onMouseLeave={(e) => {
                 if (!active) {
                   (e.currentTarget as HTMLButtonElement).style.backgroundColor =
                     "transparent";
-                  (e.currentTarget as HTMLButtonElement).style.color =
-                    SIDEBAR_TEXT;
+                  (e.currentTarget as HTMLButtonElement).style.color = C.text;
                 }
               }}
             >
@@ -192,16 +206,13 @@ export default function Layout() {
       </nav>
 
       {/* User & Logout */}
-      <div
-        className="px-3 py-4"
-        style={{ borderTop: `1px solid ${SIDEBAR_BORDER}` }}
-      >
+      <div className="px-3 py-4" style={{ borderTop: `1px solid ${C.border}` }}>
         <div className="flex items-center gap-2 px-3 py-2 mb-2">
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
             style={{
-              backgroundColor: SIDEBAR_ACTIVE_BG,
-              color: SIDEBAR_ACTIVE_TEXT,
+              backgroundColor: C.avatarBg,
+              color: C.avatarText,
             }}
           >
             {session?.name?.[0]?.toUpperCase() ?? "A"}
@@ -209,13 +220,13 @@ export default function Layout() {
           <div className="min-w-0">
             <p
               className="text-xs font-semibold truncate"
-              style={{ color: SIDEBAR_TEXT }}
+              style={{ color: C.text }}
             >
               {session?.name}
             </p>
             <p
               className="text-xs truncate capitalize"
-              style={{ color: SIDEBAR_TEXT_DIM }}
+              style={{ color: C.textDim }}
             >
               {session?.role}
             </p>
@@ -226,7 +237,7 @@ export default function Layout() {
           data-ocid="sidebar.logout_button"
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all"
-          style={{ color: SIDEBAR_TEXT_DIM }}
+          style={{ color: C.textDim }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLButtonElement).style.backgroundColor =
               "rgba(239,68,68,0.15)";
@@ -235,8 +246,7 @@ export default function Layout() {
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLButtonElement).style.backgroundColor =
               "transparent";
-            (e.currentTarget as HTMLButtonElement).style.color =
-              SIDEBAR_TEXT_DIM;
+            (e.currentTarget as HTMLButtonElement).style.color = C.textDim;
           }}
         >
           <LogOut className="w-4 h-4" />
@@ -251,7 +261,7 @@ export default function Layout() {
       {/* Desktop Sidebar */}
       <aside
         className="hidden md:flex w-64 flex-col flex-shrink-0"
-        style={{ backgroundColor: SIDEBAR_BG }}
+        style={{ backgroundColor: C.bg }}
       >
         <SidebarContent />
       </aside>
@@ -269,7 +279,7 @@ export default function Layout() {
           />
           <aside
             className="absolute left-0 top-0 h-full w-64 flex flex-col"
-            style={{ backgroundColor: SIDEBAR_BG }}
+            style={{ backgroundColor: C.bg }}
           >
             <SidebarContent />
           </aside>

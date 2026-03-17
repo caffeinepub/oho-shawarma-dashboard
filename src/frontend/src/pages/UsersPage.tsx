@@ -160,8 +160,8 @@ export default function UsersPage() {
 
   const renderRoleBadge = (role: string) => (
     <Badge
+      className={`capitalize ${role === "admin" ? "badge-brand" : ""}`}
       variant={role === "admin" ? "default" : "secondary"}
-      className="capitalize"
     >
       {role}
     </Badge>
@@ -185,7 +185,7 @@ export default function UsersPage() {
         <Button
           data-ocid="users.add_button"
           onClick={() => setAddOpen(true)}
-          className="gap-2"
+          className="gap-2 btn-brand"
         >
           <UserPlus className="w-4 h-4" />
           Add User
@@ -207,12 +207,12 @@ export default function UsersPage() {
         <div className="border rounded-lg overflow-hidden">
           <Table data-ocid="users.table">
             <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="font-semibold">Name</TableHead>
-                <TableHead className="font-semibold">Email</TableHead>
-                <TableHead className="font-semibold">Role</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold text-right">
+              <TableRow className="bg-muted/40 tr-brand-header">
+                <TableHead className="font-semibold th-brand">Name</TableHead>
+                <TableHead className="font-semibold th-brand">Email</TableHead>
+                <TableHead className="font-semibold th-brand">Role</TableHead>
+                <TableHead className="font-semibold th-brand">Status</TableHead>
+                <TableHead className="font-semibold text-right th-brand">
                   Actions
                 </TableHead>
               </TableRow>
@@ -253,7 +253,7 @@ export default function UsersPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="Edit"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Pencil className="w-3.5 h-3.5 icon-brand" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -267,7 +267,7 @@ export default function UsersPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="Reset Password"
                       >
-                        <KeyRound className="w-3.5 h-3.5" />
+                        <KeyRound className="w-3.5 h-3.5 icon-brand" />
                       </Button>
                       {user.id !== session?.userId && (
                         <>
@@ -280,7 +280,7 @@ export default function UsersPage() {
                               className="h-8 w-8 hover:bg-orange-500/10 hover:text-orange-500"
                               title="Deactivate"
                             >
-                              <PowerOff className="w-3.5 h-3.5" />
+                              <PowerOff className="w-3.5 h-3.5 icon-brand" />
                             </Button>
                           ) : (
                             <Button
@@ -291,7 +291,7 @@ export default function UsersPage() {
                               className="h-8 w-8 hover:bg-green-500/10 hover:text-green-500"
                               title="Reactivate"
                             >
-                              <RefreshCw className="w-3.5 h-3.5" />
+                              <RefreshCw className="w-3.5 h-3.5 icon-brand" />
                             </Button>
                           )}
                           <Button
@@ -302,7 +302,7 @@ export default function UsersPage() {
                             className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5 icon-brand" />
                           </Button>
                         </>
                       )}
@@ -385,6 +385,7 @@ export default function UsersPage() {
             </Button>
             <Button
               data-ocid="users.add_modal.submit_button"
+              className="btn-brand"
               onClick={handleAdd}
             >
               Create User
@@ -451,6 +452,7 @@ export default function UsersPage() {
             </Button>
             <Button
               data-ocid="users.edit_modal.save_button"
+              className="btn-brand"
               onClick={handleEdit}
             >
               Save Changes
@@ -503,6 +505,7 @@ export default function UsersPage() {
             </Button>
             <Button
               data-ocid="users.reset_modal.submit_button"
+              className="btn-brand"
               onClick={handleReset}
             >
               Reset Password

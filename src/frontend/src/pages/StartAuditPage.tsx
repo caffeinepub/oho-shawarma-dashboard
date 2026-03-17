@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -97,6 +98,7 @@ export default function StartAuditPage() {
   const [managerSignature, setManagerSignature] = useState<string | undefined>(
     undefined,
   );
+  const [managerName, setManagerName] = useState("");
   const [auditDate, setAuditDate] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -191,27 +193,17 @@ export default function StartAuditPage() {
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const MAX = 1024;
-        let { width, height } = img;
-        if (width > MAX || height > MAX) {
-          if (width > height) {
-            height = Math.round((height * MAX) / width);
-            width = MAX;
-          } else {
-            width = Math.round((width * MAX) / height);
-            height = MAX;
-          }
-        }
+        // No size cap -- preserve original resolution for quality
         const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = img.width;
+        canvas.height = img.height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           reject(new Error("Canvas not supported"));
           return;
         }
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.75));
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
       };
       img.onerror = reject;
       img.src = url;
@@ -283,7 +275,7 @@ export default function StartAuditPage() {
 
     setSubmitting(true);
     try {
-      const submission = createAuditSubmission({
+      const submission = await createAuditSubmission({
         outletId: selectedOutlet.id,
         outletName: selectedOutlet.name,
         auditorId: session.userId,
@@ -294,6 +286,7 @@ export default function StartAuditPage() {
         overallRemarks,
         auditorSignature,
         managerSignature,
+        managerName,
         auditDate,
       });
 
@@ -301,7 +294,7 @@ export default function StartAuditPage() {
       navigate({ to: "/audit-summary/$id", params: { id: submission.id } });
     } catch (err) {
       console.error("Submission failed:", err);
-      toast.error("Submission failed. Please try again or reduce photo sizes.");
+      toast.error("Submission failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -344,7 +337,7 @@ export default function StartAuditPage() {
             </Select>
 
             <Button
-              className="w-full gap-2"
+              className="w-full gap-2 btn-brand"
               disabled={!selectedOutletId}
               data-ocid="start_audit.primary_button"
               onClick={handleStartAudit}
@@ -611,7 +604,20 @@ export default function StartAuditPage() {
                 onChange={setAuditorSignature}
               />
             </div>
-            <div data-ocid="audit_summary.manager_signature.canvas_target">
+            <div
+              data-ocid="audit_summary.manager_signature.canvas_target"
+              className="space-y-3"
+            >
+              <div className="space-y-1">
+                <Label htmlFor="manager-name-input">Manager Name</Label>
+                <Input
+                  id="manager-name-input"
+                  data-ocid="audit_summary.manager_name.input"
+                  placeholder="Enter manager name"
+                  value={managerName}
+                  onChange={(e) => setManagerName(e.target.value)}
+                />
+              </div>
               <SignaturePad
                 label="Manager Signature *"
                 onChange={setManagerSignature}
@@ -672,7 +678,7 @@ export default function StartAuditPage() {
           Back
         </button>
         <Button
-          className="gap-2 min-w-[160px]"
+          className="gap-2 min-w-[160px] btn-brand"
           disabled={submitting}
           data-ocid="start_audit.submit_button"
           onClick={handleSubmit}

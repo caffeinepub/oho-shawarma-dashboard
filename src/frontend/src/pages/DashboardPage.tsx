@@ -65,8 +65,11 @@ function AuditorDashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               My Total Audits
             </CardTitle>
-            <div className="w-9 h-9 rounded-lg bg-[#fdbc0c] flex items-center justify-center">
-              <ClipboardList className="w-5 h-5 text-[#361e14]" />
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: "#e0f2fe" }}
+            >
+              <ClipboardList className="w-5 h-5" style={{ color: "#0ea5e9" }} />
             </div>
           </CardHeader>
           <CardContent>
@@ -85,7 +88,7 @@ function AuditorDashboard() {
           </CardHeader>
           <CardContent>
             <Button
-              className="w-full gap-2"
+              className="w-full gap-2 btn-brand"
               data-ocid="auditor.start_audit.primary_button"
               onClick={() => navigate({ to: "/start-audit" })}
             >
@@ -117,11 +120,17 @@ function AuditorDashboard() {
           ) : (
             <Table data-ocid="auditor.recent_audits.table">
               <TableHeader>
-                <TableRow className="bg-[#fdbc0c]/15">
-                  <TableHead className="font-semibold">Outlet</TableHead>
-                  <TableHead className="font-semibold">Date</TableHead>
-                  <TableHead className="font-semibold">Score</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
+                <TableRow className="bg-muted/40 tr-brand-header">
+                  <TableHead className="font-semibold th-brand">
+                    Outlet
+                  </TableHead>
+                  <TableHead className="font-semibold th-brand">Date</TableHead>
+                  <TableHead className="font-semibold th-brand">
+                    Score
+                  </TableHead>
+                  <TableHead className="font-semibold th-brand">
+                    Status
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,6 +177,13 @@ function AuditorDashboard() {
     </div>
   );
 }
+
+const STAT_ICON_COLORS = [
+  { bg: "#e0f2fe", icon: "#0ea5e9" }, // sky for Users
+  { bg: "#d1fae5", icon: "#10b981" }, // emerald for Outlets
+  { bg: "#ede9fe", icon: "#8b5cf6" }, // violet for Audits
+  { bg: "#ffedd5", icon: "#f97316" }, // orange for Auditors
+];
 
 function AdminDashboard() {
   const session = getSession();
@@ -216,14 +232,20 @@ function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+        {stats.map((stat, i) => (
           <Card key={stat.label} className="border">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.label}
               </CardTitle>
-              <div className="w-9 h-9 rounded-lg bg-[#fdbc0c] flex items-center justify-center">
-                <stat.icon className="w-5 h-5 text-[#361e14]" />
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: STAT_ICON_COLORS[i].bg }}
+              >
+                <stat.icon
+                  className="w-5 h-5"
+                  style={{ color: STAT_ICON_COLORS[i].icon }}
+                />
               </div>
             </CardHeader>
             <CardContent>

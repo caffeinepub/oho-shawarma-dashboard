@@ -180,7 +180,7 @@ export default function OutletsPage() {
           <Button
             data-ocid="outlets.add_button"
             onClick={() => setAddOpen(true)}
-            className="gap-2"
+            className="gap-2 btn-brand"
           >
             <PlusCircle className="w-4 h-4" />
             Add Outlet
@@ -204,11 +204,11 @@ export default function OutletsPage() {
         <div className="border rounded-lg overflow-hidden">
           <Table data-ocid="outlets.table">
             <TableHeader>
-              <TableRow className="bg-[#fdbc0c]/15">
-                <TableHead className="font-semibold">Name</TableHead>
-                <TableHead className="font-semibold">Code</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold text-right">
+              <TableRow className="bg-muted/40 tr-brand-header">
+                <TableHead className="font-semibold th-brand">Name</TableHead>
+                <TableHead className="font-semibold th-brand">Code</TableHead>
+                <TableHead className="font-semibold th-brand">Status</TableHead>
+                <TableHead className="font-semibold text-right th-brand">
                   Actions
                 </TableHead>
               </TableRow>
@@ -248,17 +248,23 @@ export default function OutletsPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="Edit"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Pencil
+                          className="w-3.5 h-3.5"
+                          style={{ color: "#22c55e" }}
+                        />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         data-ocid={`outlets.secondary_button.${idx + 1}`}
                         onClick={() => setDeactivateTarget(outlet)}
-                        className="h-8 w-8 hover:bg-orange-500/10 hover:text-orange-500"
+                        className="h-8 w-8 hover:bg-orange-500/10"
                         title="Deactivate"
                       >
-                        <PowerOff className="w-3.5 h-3.5" />
+                        <PowerOff
+                          className="w-3.5 h-3.5"
+                          style={{ color: "#6b7280" }}
+                        />
                       </Button>
                       {outlet.isTest && (
                         <>
@@ -267,20 +273,26 @@ export default function OutletsPage() {
                             size="icon"
                             data-ocid={`outlets.clear_test_button.${idx + 1}`}
                             onClick={() => setClearTestTarget(outlet)}
-                            className="h-8 w-8 hover:bg-amber-500/10 hover:text-amber-600"
+                            className="h-8 w-8 hover:bg-sky-500/10"
                             title="Remove Test Data"
                           >
-                            <Eraser className="w-3.5 h-3.5" />
+                            <Eraser
+                              className="w-3.5 h-3.5"
+                              style={{ color: "#38bdf8" }}
+                            />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             data-ocid={`outlets.delete_button.${idx + 1}`}
                             onClick={() => setDeleteTarget(outlet)}
-                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                            className="h-8 w-8 hover:bg-destructive/10"
                             title="Delete Test Outlet"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2
+                              className="w-3.5 h-3.5"
+                              style={{ color: "#ef4444" }}
+                            />
                           </Button>
                         </>
                       )}
@@ -316,11 +328,17 @@ export default function OutletsPage() {
             <div className="border rounded-lg overflow-hidden mt-2">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="font-semibold">Name</TableHead>
-                    <TableHead className="font-semibold">Code</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold text-right">
+                  <TableRow className="bg-muted/40 tr-brand-header">
+                    <TableHead className="font-semibold th-brand">
+                      Name
+                    </TableHead>
+                    <TableHead className="font-semibold th-brand">
+                      Code
+                    </TableHead>
+                    <TableHead className="font-semibold th-brand">
+                      Status
+                    </TableHead>
+                    <TableHead className="font-semibold text-right th-brand">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -405,6 +423,7 @@ export default function OutletsPage() {
             </Button>
             <Button
               data-ocid="outlets.add_modal.submit_button"
+              className="btn-brand"
               onClick={handleAdd}
             >
               Add Outlet
@@ -459,6 +478,7 @@ export default function OutletsPage() {
             </Button>
             <Button
               data-ocid="outlets.edit_modal.save_button"
+              className="btn-brand"
               onClick={handleEdit}
             >
               Save Changes

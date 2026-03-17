@@ -1,4 +1,5 @@
 // Frontend-only auth + data store using localStorage
+import { deleteImagesBySubmission, getImage, saveImage } from "./imageDb";
 
 export interface User {
   id: string;
@@ -63,6 +64,7 @@ export interface AuditSubmission {
   overallRemarks?: string;
   auditorSignature?: string;
   managerSignature?: string;
+  managerName?: string;
   auditDate?: string;
 }
 
@@ -463,12 +465,19 @@ export function clearSampleData(): void {
 }
 
 // Remove all audit data linked to the Test Outlet
-export function clearTestOutletData(): void {
+export async function clearTestOutletData(): Promise<void> {
   const testOutlets = getAllOutlets().filter((o) => o.isTest);
   const testNames = new Set(testOutlets.map((o) => o.name));
+  const removedSubmissions = getAuditSubmissions().filter((s) =>
+    testNames.has(s.outletName),
+  );
   saveAudits(getAuditReports().filter((r) => !testNames.has(r.outletName)));
   saveSubmissions(
     getAuditSubmissions().filter((s) => !testNames.has(s.outletName)),
+  );
+  // Clean up images for removed submissions
+  await Promise.all(
+    removedSubmissions.map((s) => deleteImagesBySubmission(s.id)),
   );
 }
 
@@ -507,9 +516,59 @@ export function getAuditSubmissionById(
   return initSubmissions().find((s) => s.id === id);
 }
 
-export function createAuditSubmission(
+/**
+ * Load images from IndexedDB and rehydrate them into a submission's sections.
+ * Call this before generating a PDF or displaying photos.
+ */
+export async function loadImagesForSubmission(
+  submission: AuditSubmission,
+): Promise<AuditSubmission> {
+  const sections = await Promise.all(
+    submission.sections.map(async (section) => ({
+      ...section,
+      items: await Promise.all(
+        section.items.map(async (item) => {
+          const key = `${submission.id}::${section.id}::${item.id}`;
+          const imageBase64 = await getImage(key);
+          return imageBase64 ? { ...item, imageBase64 } : item;
+        }),
+      ),
+    })),
+  );
+  return { ...submission, sections };
+}
+
+/**
+ * Save images from sections to IndexedDB and return sections with images stripped.
+ * This keeps localStorage free of large base64 blobs.
+ */
+async function saveImagesToDb(
+  submissionId: string,
+  sections: AuditSection[],
+): Promise<AuditSection[]> {
+  const stripped = await Promise.all(
+    sections.map(async (section) => ({
+      ...section,
+      items: await Promise.all(
+        section.items.map(async (item) => {
+          if (item.imageBase64) {
+            const key = `${submissionId}::${section.id}::${item.id}`;
+            await saveImage(key, item.imageBase64);
+            // Return item without the base64 blob
+            const { imageBase64: _, ...rest } = item;
+            return rest as AuditItem;
+          }
+          return item;
+        }),
+      ),
+    })),
+  );
+  return stripped;
+}
+
+export async function createAuditSubmission(
   data: Omit<AuditSubmission, "id" | "auditId" | "sectionScores" | "score">,
-): AuditSubmission {
+): Promise<AuditSubmission> {
   const uuid = crypto.randomUUID();
   const dateObj = new Date(data.submittedAt);
   const datePart = dateObj.toISOString().slice(0, 10).replace(/-/g, "");
@@ -523,14 +582,18 @@ export function createAuditSubmission(
 
   const score = calculateFinalScore(data.sections);
 
-  const submission: AuditSubmission = {
+  // Save images to IndexedDB and strip them from the localStorage entry
+  const strippedSections = await saveImagesToDb(uuid, data.sections);
+
+  const submissionForStorage: AuditSubmission = {
     ...data,
+    sections: strippedSections,
     id: uuid,
     auditId,
     sectionScores,
     score,
   };
-  saveSubmissions([...getAuditSubmissions(), submission]);
+  saveSubmissions([...getAuditSubmissions(), submissionForStorage]);
 
   // Also create an AuditReport entry for admin view
   const dateStr = dateObj.toISOString().split("T")[0];
@@ -545,7 +608,15 @@ export function createAuditSubmission(
     submissionId: uuid,
   });
 
-  return submission;
+  // Return the full submission with images still in memory (for immediate use)
+  return {
+    ...data,
+    sections: data.sections,
+    id: uuid,
+    auditId,
+    sectionScores,
+    score,
+  };
 }
 
 // ---- Session ----

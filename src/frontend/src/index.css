@@ -28,15 +28,15 @@
 
     /* Background */
     --background: 0.97 0.005 240;
-    --foreground: 0.18 0.01 260;
+    --foreground: 0.2 0.055 35;
 
     /* Card */
     --card: 1 0 0;
-    --card-foreground: 0.18 0.01 260;
+    --card-foreground: 0.2 0.055 35;
 
     /* Popover */
     --popover: 1 0 0;
-    --popover-foreground: 0.18 0.01 260;
+    --popover-foreground: 0.2 0.055 35;
 
     /* Secondary */
     --secondary: 0.93 0.01 240;
@@ -80,35 +80,36 @@
   }
 
   .dark {
-    --background: 0.13 0.01 250;
-    --foreground: 0.93 0.005 240;
+    /* Standard neutral dark mode - no branding colors */
+    --background: 0.145 0 0;
+    --foreground: 0.985 0 0;
 
-    --card: 0.17 0.01 255;
-    --card-foreground: 0.93 0.005 240;
+    --card: 0.205 0 0;
+    --card-foreground: 0.985 0 0;
 
-    --popover: 0.17 0.01 255;
-    --popover-foreground: 0.93 0.005 240;
+    --popover: 0.205 0 0;
+    --popover-foreground: 0.985 0 0;
 
-    --primary: 0.81 0.185 83;
-    --primary-foreground: 0.2 0.055 35;
+    --primary: 0.985 0 0;
+    --primary-foreground: 0.205 0 0;
 
-    --secondary: 0.22 0.01 260;
-    --secondary-foreground: 0.88 0.005 240;
+    --secondary: 0.269 0 0;
+    --secondary-foreground: 0.985 0 0;
 
-    --muted: 0.22 0.01 260;
-    --muted-foreground: 0.58 0.01 260;
+    --muted: 0.269 0 0;
+    --muted-foreground: 0.708 0 0;
 
-    --accent: 0.25 0.03 87;
-    --accent-foreground: 0.93 0.005 240;
+    --accent: 0.269 0 0;
+    --accent-foreground: 0.985 0 0;
 
-    --destructive: 0.55 0.22 25;
-    --destructive-foreground: 1 0 0;
+    --destructive: 0.396 0.141 25.723;
+    --destructive-foreground: 0.985 0 0;
 
-    --border: 0.26 0.01 260;
-    --input: 0.26 0.01 260;
-    --ring: 0.81 0.185 83;
+    --border: 0.269 0 0;
+    --input: 0.269 0 0;
+    --ring: 0.439 0 0;
 
-    /* Sidebar stays brand brown in dark too */
+    /* Sidebar stays brand brown in dark mode */
     --sidebar: 0.2 0.055 35;
     --sidebar-foreground: 1 0 0;
     --sidebar-primary: 0.81 0.185 83;
@@ -127,4 +128,42 @@
   body {
     @apply bg-background text-foreground font-body;
   }
+}
+
+/* Brand button - adapts for dark mode */
+.btn-brand {
+  background-color: #361e14 !important;
+  color: #ffffff !important;
+}
+.dark .btn-brand {
+  background-color: oklch(0.269 0 0) !important;
+  color: oklch(0.985 0 0) !important;
+}
+
+/* Brand icon - adapts for dark mode */
+.icon-brand {
+  color: #361e14;
+}
+.dark .icon-brand {
+  color: #94a3b8;
+}
+
+/* Brand badge - adapts for dark mode */
+.badge-brand {
+  background-color: #361e14 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+.dark .badge-brand {
+  background-color: oklch(0.269 0 0) !important;
+  color: oklch(0.985 0 0) !important;
+}
+
+/* Table header brand styling - light mode only */
+:root:not(.dark) .th-brand {
+  background-color: #fdbc0c !important;
+  color: #361e14 !important;
+}
+:root:not(.dark) .tr-brand-header {
+  background-color: #fdbc0c !important;
 }

@@ -14,6 +14,7 @@ import {
   type AuditSubmission,
   getMyAuditSubmissions,
   getSession,
+  loadImagesForSubmission,
 } from "@/lib/store";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -47,7 +48,9 @@ export default function MyAuditReportsPage() {
   const handleDownload = async (audit: AuditSubmission) => {
     setDownloading(audit.id);
     try {
-      await generateAuditPDF(audit);
+      // Load images from IndexedDB before generating PDF
+      const auditWithImages = await loadImagesForSubmission(audit);
+      await generateAuditPDF(auditWithImages);
     } finally {
       setDownloading(null);
     }
@@ -78,13 +81,15 @@ export default function MyAuditReportsPage() {
         <div className="border rounded-lg overflow-hidden">
           <Table data-ocid="my_audits.table">
             <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="font-semibold">Audit ID</TableHead>
-                <TableHead className="font-semibold">Outlet</TableHead>
-                <TableHead className="font-semibold">Date</TableHead>
-                <TableHead className="font-semibold">Score</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold text-right">
+              <TableRow className="bg-muted/40 tr-brand-header">
+                <TableHead className="font-semibold th-brand">
+                  Audit ID
+                </TableHead>
+                <TableHead className="font-semibold th-brand">Outlet</TableHead>
+                <TableHead className="font-semibold th-brand">Date</TableHead>
+                <TableHead className="font-semibold th-brand">Score</TableHead>
+                <TableHead className="font-semibold th-brand">Status</TableHead>
+                <TableHead className="font-semibold th-brand text-right">
                   Actions
                 </TableHead>
               </TableRow>
@@ -141,7 +146,7 @@ export default function MyAuditReportsPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="View Report"
                       >
-                        <Eye className="w-3.5 h-3.5" />
+                        <Eye className="w-3.5 h-3.5 icon-brand" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -152,7 +157,7 @@ export default function MyAuditReportsPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="Download PDF Report"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-3.5 h-3.5 icon-brand" />
                       </Button>
                     </div>
                   </TableCell>

@@ -44,17 +44,17 @@ import {
 } from "recharts";
 
 // ---- Color Palette ----
-const BRAND_YELLOW = "#fdbc0c";
+const ANALYTICS_ACCENT = "#0ea5e9";
 const TIER_COLORS = {
   excellent: "#22c55e",
   good: "#3b82f6",
-  needsImprovement: "#f59e0b",
+  needsImprovement: "#f97316",
   critical: "#ef4444",
 };
 
 // Flat colorful palette for section/hygiene bars
 const FLAT_COLORS = [
-  "#fdbc0c", // brand yellow
+  "#0ea5e9", // sky blue
   "#3b82f6", // blue
   "#10b981", // emerald
   "#f97316", // orange
@@ -222,7 +222,7 @@ function DrillDownPanel({
 }
 
 const trendChartConfig: ChartConfig = {
-  score: { label: "Avg Compliance %", color: BRAND_YELLOW },
+  score: { label: "Avg Compliance %", color: "#0ea5e9" },
 };
 
 export default function AnalyticsPage() {
@@ -507,7 +507,10 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="font-display font-semibold text-lg flex items-center gap-2">
-            <BarChart2 className="w-5 h-5" style={{ color: BRAND_YELLOW }} />
+            <BarChart2
+              className="w-5 h-5"
+              style={{ color: ANALYTICS_ACCENT }}
+            />
             Analytics Dashboard
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -640,7 +643,7 @@ export default function AnalyticsPage() {
             value: outletsAudited,
             suffix: "",
             icon: <Store className="w-4 h-4" />,
-            color: BRAND_YELLOW,
+            color: ANALYTICS_ACCENT,
           },
         ].map((kpi, i) => (
           <Card
@@ -704,7 +707,7 @@ export default function AnalyticsPage() {
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
                 <TrendingUp
                   className="w-4 h-4"
-                  style={{ color: BRAND_YELLOW }}
+                  style={{ color: ANALYTICS_ACCENT }}
                 />
                 Compliance Score Distribution
               </CardTitle>
@@ -770,6 +773,15 @@ export default function AnalyticsPage() {
                         `${value} audit${Number(value) !== 1 ? "s" : ""}`,
                         name,
                       ]}
+                      contentStyle={{
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "6px",
+                        color: "#26283B",
+                        fontSize: 12,
+                      }}
+                      labelStyle={{ color: "#26283B", fontWeight: 600 }}
+                      itemStyle={{ color: "#26283B" }}
                     />
                     <Legend />
                   </PieChart>
@@ -856,7 +868,7 @@ export default function AnalyticsPage() {
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
                 <TrendingUp
                   className="w-4 h-4"
-                  style={{ color: BRAND_YELLOW }}
+                  style={{ color: ANALYTICS_ACCENT }}
                 />
                 Audit Trend Over Time
               </CardTitle>
@@ -882,8 +894,29 @@ export default function AnalyticsPage() {
                       dataKey="date"
                       tick={{ fontSize: 11 }}
                       tickFormatter={(v) => {
-                        const d = new Date(v);
-                        return `${d.getDate()} ${d.toLocaleString("en", { month: "short" })}`;
+                        if (!v || typeof v !== "string") return "";
+                        const parts = v.split("-");
+                        if (parts.length === 3) {
+                          const months = [
+                            "Jan",
+                            "Feb",
+                            "Mar",
+                            "Apr",
+                            "May",
+                            "Jun",
+                            "Jul",
+                            "Aug",
+                            "Sep",
+                            "Oct",
+                            "Nov",
+                            "Dec",
+                          ];
+                          const month = Number.parseInt(parts[1], 10) - 1;
+                          if (month >= 0 && month < 12) {
+                            return `${Number.parseInt(parts[2], 10)} ${months[month]}`;
+                          }
+                        }
+                        return v;
                       }}
                       angle={-30}
                       textAnchor="end"
@@ -897,9 +930,9 @@ export default function AnalyticsPage() {
                     <Line
                       type="monotone"
                       dataKey="score"
-                      stroke={BRAND_YELLOW}
+                      stroke={ANALYTICS_ACCENT}
                       strokeWidth={2.5}
-                      dot={{ r: 4, fill: BRAND_YELLOW }}
+                      dot={{ r: 4, fill: ANALYTICS_ACCENT }}
                       activeDot={{ r: 6 }}
                     />
                   </LineChart>
@@ -921,7 +954,7 @@ export default function AnalyticsPage() {
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
                 <BarChart2
                   className="w-4 h-4"
-                  style={{ color: BRAND_YELLOW }}
+                  style={{ color: ANALYTICS_ACCENT }}
                 />
                 Section Performance
               </CardTitle>
@@ -934,7 +967,7 @@ export default function AnalyticsPage() {
               filteredSubmissions.length > 0 ? (
                 <ChartContainer
                   config={{
-                    score: { label: "Avg Score %", color: BRAND_YELLOW },
+                    score: { label: "Avg Score %", color: ANALYTICS_ACCENT },
                   }}
                   className="h-[280px] w-full"
                 >
@@ -958,11 +991,15 @@ export default function AnalyticsPage() {
                     <Tooltip
                       formatter={(v) => [`${v}%`, "Avg Score"]}
                       contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "6px",
+                        color: "#26283B",
                         fontSize: 12,
                       }}
+                      labelStyle={{ color: "#26283B", fontWeight: 600 }}
+                      itemStyle={{ color: "#26283B" }}
+                      cursor={{ fill: "rgba(0,0,0,0.05)" }}
                     />
                     <Bar
                       dataKey="score"
@@ -1008,7 +1045,7 @@ export default function AnalyticsPage() {
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
                 <CheckCircle2
                   className="w-4 h-4"
-                  style={{ color: BRAND_YELLOW }}
+                  style={{ color: ANALYTICS_ACCENT }}
                 />
                 Hygiene Compliance
               </CardTitle>
@@ -1020,7 +1057,7 @@ export default function AnalyticsPage() {
               {filteredSubmissions.length > 0 ? (
                 <ChartContainer
                   config={{
-                    score: { label: "Score %", color: BRAND_YELLOW },
+                    score: { label: "Score %", color: ANALYTICS_ACCENT },
                   }}
                   className="h-[280px] w-full"
                 >
@@ -1044,11 +1081,15 @@ export default function AnalyticsPage() {
                     <Tooltip
                       formatter={(v) => [`${v}%`, "Score"]}
                       contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "6px",
+                        color: "#26283B",
                         fontSize: 12,
                       }}
+                      labelStyle={{ color: "#26283B", fontWeight: 600 }}
+                      itemStyle={{ color: "#26283B" }}
+                      cursor={{ fill: "rgba(0,0,0,0.05)" }}
                     />
                     <Bar
                       dataKey="score"
@@ -1095,7 +1136,10 @@ export default function AnalyticsPage() {
           >
             <CardHeader className="pb-2">
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
-                <Store className="w-4 h-4" style={{ color: BRAND_YELLOW }} />
+                <Store
+                  className="w-4 h-4"
+                  style={{ color: ANALYTICS_ACCENT }}
+                />
                 Outlet Performance Comparison
               </CardTitle>
               <p className="text-xs text-muted-foreground">
@@ -1104,7 +1148,7 @@ export default function AnalyticsPage() {
                 {outletPerformance.length > 8 && (
                   <span
                     className="ml-2 font-medium"
-                    style={{ color: BRAND_YELLOW }}
+                    style={{ color: ANALYTICS_ACCENT }}
                   >
                     (scroll right to see all)
                   </span>
@@ -1117,7 +1161,10 @@ export default function AnalyticsPage() {
                   <div style={{ minWidth: `${outletChartWidth}px` }}>
                     <ChartContainer
                       config={{
-                        score: { label: "Avg Score %", color: BRAND_YELLOW },
+                        score: {
+                          label: "Avg Score %",
+                          color: ANALYTICS_ACCENT,
+                        },
                       }}
                       className="h-[320px] w-full"
                     >
@@ -1150,11 +1197,15 @@ export default function AnalyticsPage() {
                             "Avg Score",
                           ]}
                           contentStyle={{
-                            backgroundColor: "hsl(var(--background))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
+                            backgroundColor: "#ffffff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "6px",
+                            color: "#26283B",
                             fontSize: 12,
                           }}
+                          labelStyle={{ color: "#26283B", fontWeight: 600 }}
+                          itemStyle={{ color: "#26283B" }}
+                          cursor={{ fill: "rgba(0,0,0,0.05)" }}
                         />
                         <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                           {outletPerformance.map((entry) => (

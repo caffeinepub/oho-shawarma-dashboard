@@ -9,7 +9,7 @@ const PAGE_HEIGHT = 297;
 const MARGIN = 14;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 // Images at 70% of content width, capped at 120mm height to avoid very tall pages
-const IMG_MAX_W = Math.round(CONTENT_WIDTH * 0.7);
+const IMG_MAX_W = Math.round(CONTENT_WIDTH * 0.5);
 const IMG_MAX_H = 120;
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -314,33 +314,41 @@ export async function generateAuditPDF(
 
       // Remarks — bold label, darker text
       if (item.remarks) {
-        doc.setFontSize(7);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(40, 40, 40);
-        doc.text("Remarks:", MARGIN + 2, y + 11);
+        doc.text("Remarks:", MARGIN + 2, y + 12);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(35, 35, 35);
-        doc.text(item.remarks, MARGIN + 22, y + 11, { maxWidth: 132 });
-        y += 6;
+        const remarkLines = doc.splitTextToSize(item.remarks, 128);
+        for (let ri = 0; ri < remarkLines.length; ri++) {
+          doc.text(remarkLines[ri], MARGIN + 24, y + 12 + ri * 5);
+        }
+        y += 7 + (remarkLines.length - 1) * 5;
       }
 
       y += 8;
 
       // Follow-up action
       if (hasFollowUp) {
-        y = checkPageBreak(doc, y, 10, pageNum);
+        const followUpLines = doc.splitTextToSize(
+          item.followUpAction ?? "",
+          CONTENT_WIDTH - 46,
+        );
+        const followUpH = 10 + (followUpLines.length - 1) * 5;
+        y = checkPageBreak(doc, y, followUpH + 4, pageNum);
         doc.setFillColor(254, 242, 242);
-        doc.rect(MARGIN + 2, y, CONTENT_WIDTH - 4, 8, "F");
-        doc.setFontSize(7);
+        doc.rect(MARGIN + 2, y, CONTENT_WIDTH - 4, followUpH + 2, "F");
+        doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(153, 27, 27);
-        doc.text("Follow-up Action:", MARGIN + 4, y + 5);
+        doc.text("Follow-up Action:", MARGIN + 4, y + 6);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80, 30, 30);
-        doc.text(item.followUpAction ?? "", MARGIN + 38, y + 5, {
-          maxWidth: CONTENT_WIDTH - 44,
-        });
-        y += 11;
+        for (let fi = 0; fi < followUpLines.length; fi++) {
+          doc.text(followUpLines[fi], MARGIN + 40, y + 6 + fi * 5);
+        }
+        y += followUpH + 5;
       }
 
       // Image — preserve original aspect ratio, 70% of content width
@@ -423,7 +431,10 @@ export async function generateAuditPDF(
   doc.setFont("helvetica", "bold");
   doc.setTextColor(60, 60, 60);
   doc.text("Auditor Signature", MARGIN + 2, y + 5);
-  doc.text("Manager Signature", MARGIN + sigW + 8, y + 5);
+  const managerSigLabel = submission.managerName
+    ? `Manager Signature — ${submission.managerName}`
+    : "Manager Signature";
+  doc.text(managerSigLabel, MARGIN + sigW + 8, y + 5, { maxWidth: sigW });
   y += 7;
 
   const sigH = 28;

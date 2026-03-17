@@ -16,11 +16,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { generateAuditPDF } from "@/lib/pdf";
 import {
   type AuditReport,
   clearSampleData,
   getAuditReports,
   getAuditSubmissionById,
+  loadImagesForSubmission,
 } from "@/lib/store";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -29,6 +31,7 @@ import {
   ClipboardList,
   Download,
   Eye,
+  Loader2,
   Search,
   Trash2,
   X,
@@ -60,6 +63,7 @@ export default function AuditReportsPage() {
   const [reports, setReports] = useState<AuditReport[]>(() =>
     getAuditReports(),
   );
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const refresh = () => setReports(getAuditReports());
 
@@ -71,8 +75,25 @@ export default function AuditReportsPage() {
     toast.success("Sample and test data cleared.");
   };
 
-  const handleDownload = (report: AuditReport) => {
-    toast.success(`Report for ${report.outletName} downloaded.`);
+  const handleDownload = async (report: AuditReport) => {
+    if (!report.submissionId) {
+      toast.error("No submission data available for this report.");
+      return;
+    }
+    const sub = getAuditSubmissionById(report.submissionId);
+    if (!sub) {
+      toast.error("Submission data not found.");
+      return;
+    }
+    setDownloadingId(report.id);
+    try {
+      const subWithImages = await loadImagesForSubmission(sub);
+      await generateAuditPDF(subWithImages);
+    } catch {
+      toast.error("Failed to generate PDF. Please try again.");
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   // Filters
@@ -344,12 +365,16 @@ export default function AuditReportsPage() {
           <div className="overflow-x-auto">
             <Table data-ocid="audit.table">
               <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead className="font-semibold whitespace-nowrap">
+                <TableRow className="bg-muted/40 tr-brand-header">
+                  <TableHead className="font-semibold whitespace-nowrap th-brand">
                     Audit ID
                   </TableHead>
-                  <TableHead className="font-semibold">Outlet</TableHead>
-                  <TableHead className="font-semibold">Auditor</TableHead>
+                  <TableHead className="font-semibold th-brand">
+                    Outlet
+                  </TableHead>
+                  <TableHead className="font-semibold th-brand">
+                    Auditor
+                  </TableHead>
                   <TableHead
                     className="font-semibold cursor-pointer select-none whitespace-nowrap hover:text-foreground"
                     onClick={() => handleSort("date")}
@@ -366,8 +391,10 @@ export default function AuditReportsPage() {
                       Score <SortIcon field="score" />
                     </span>
                   </TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold text-right">
+                  <TableHead className="font-semibold th-brand">
+                    Status
+                  </TableHead>
+                  <TableHead className="font-semibold text-right th-brand">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -430,7 +457,7 @@ export default function AuditReportsPage() {
                             className="h-8 w-8 hover:bg-accent"
                             title="View Audit Summary"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5 icon-brand" />
                           </Button>
                         )}
                         <Button
@@ -438,10 +465,15 @@ export default function AuditReportsPage() {
                           size="icon"
                           data-ocid={`audit.table.primary_button.${idx + 1}`}
                           onClick={() => handleDownload(report)}
+                          disabled={downloadingId === report.id}
                           className="h-8 w-8 hover:bg-accent"
                           title="Download PDF Report"
                         >
-                          <Download className="w-3.5 h-3.5" />
+                          {downloadingId === report.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 icon-brand" />
+                          )}
                         </Button>
                       </div>
                     </TableCell>

@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { generateAuditPDF } from "@/lib/pdf";
-import { SECTION_WEIGHTS, getAuditSubmissionById } from "@/lib/store";
+import {
+  SECTION_WEIGHTS,
+  getAuditSubmissionById,
+  loadImagesForSubmission,
+} from "@/lib/store";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -62,7 +66,9 @@ export default function AuditSummaryPage() {
     if (!submission) return;
     setDownloading(true);
     try {
-      await generateAuditPDF(submission);
+      // Load images from IndexedDB before generating PDF
+      const submissionWithImages = await loadImagesForSubmission(submission);
+      await generateAuditPDF(submissionWithImages);
     } finally {
       setDownloading(false);
     }
@@ -273,6 +279,11 @@ export default function AuditSummaryPage() {
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Manager Signature
+                {submission.managerName && (
+                  <span className="ml-2 text-foreground normal-case">
+                    — {submission.managerName}
+                  </span>
+                )}
               </p>
               {submission.managerSignature ? (
                 <img
@@ -295,7 +306,7 @@ export default function AuditSummaryPage() {
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3 pt-2">
         <Button
-          className="gap-2 flex-1 sm:flex-none sm:min-w-[200px]"
+          className="gap-2 flex-1 sm:flex-none sm:min-w-[200px] btn-brand"
           disabled={downloading}
           data-ocid="audit_summary.primary_button"
           onClick={handleDownload}
