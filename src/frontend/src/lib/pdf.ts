@@ -2,12 +2,15 @@ import type { AuditSubmission } from "@/lib/store";
 import { SECTION_WEIGHTS } from "@/lib/store";
 import { jsPDF } from "jspdf";
 
-const BRAND_YELLOW = "#F5A623";
-const BRAND_DARK = "#26282E";
+const BRAND_YELLOW = "#fdbc0c";
+const BRAND_DARK = "#361e14";
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
 const MARGIN = 14;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+// Images at 70% of content width, capped at 120mm height to avoid very tall pages
+const IMG_MAX_W = Math.round(CONTENT_WIDTH * 0.7);
+const IMG_MAX_H = 120;
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = Number.parseInt(hex.slice(1, 3), 16);
@@ -54,6 +57,18 @@ function sectionLabel(id: string): string {
     "raw-material-compliance": "Raw Material Brand Compliance",
   };
   return labels[id] ?? id;
+}
+
+function getImageDimensions(
+  base64: string,
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () =>
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({ width: 1, height: 1 });
+    img.src = base64;
+  });
 }
 
 export async function generateAuditPDF(
@@ -262,7 +277,7 @@ export async function generateAuditPDF(
         10 +
         (item.remarks ? 5 : 0) +
         (hasFollowUp ? 10 : 0) +
-        (hasImage ? 32 : 0);
+        (hasImage ? IMG_MAX_H + 5 : 0);
 
       y = checkPageBreak(doc, y, estimatedH, pageNum);
 
@@ -297,14 +312,15 @@ export async function generateAuditPDF(
         doc.text(resultVal, MARGIN + 135, y + 5.5, { align: "center" });
       }
 
-      // Remarks
+      // Remarks — bold label, darker text
       if (item.remarks) {
         doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(40, 40, 40);
+        doc.text("Remarks:", MARGIN + 2, y + 11);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(90, 90, 90);
-        doc.text(`Remarks: ${item.remarks}`, MARGIN + 2, y + 11, {
-          maxWidth: 150,
-        });
+        doc.setTextColor(35, 35, 35);
+        doc.text(item.remarks, MARGIN + 22, y + 11, { maxWidth: 132 });
         y += 6;
       }
 
@@ -327,27 +343,31 @@ export async function generateAuditPDF(
         y += 11;
       }
 
-      // Image
+      // Image — preserve original aspect ratio, 70% of content width
       if (hasImage && item.imageBase64) {
-        y = checkPageBreak(doc, y, 35, pageNum);
         try {
-          // Detect format from data URL
           const fmt = item.imageBase64.startsWith("data:image/png")
             ? "PNG"
             : "JPEG";
-          const maxW = 80;
-          const maxH = 28;
+          const dims = await getImageDimensions(item.imageBase64);
+          let displayW = IMG_MAX_W;
+          let displayH = (dims.height / dims.width) * displayW;
+          if (displayH > IMG_MAX_H) {
+            displayH = IMG_MAX_H;
+            displayW = (dims.width / dims.height) * displayH;
+          }
+          y = checkPageBreak(doc, y, displayH + 5, pageNum);
           doc.addImage(
             item.imageBase64,
             fmt,
             MARGIN + 2,
             y,
-            maxW,
-            maxH,
+            displayW,
+            displayH,
             undefined,
             "FAST",
           );
-          y += maxH + 3;
+          y += displayH + 3;
         } catch {
           // skip image on error
         }
@@ -373,16 +393,16 @@ export async function generateAuditPDF(
   doc.text("AUDIT SUMMARY", MARGIN + 3, y + 5);
   y += 10;
 
-  // Overall Remarks
+  // Overall Remarks — with clear line gap after heading
   if (submission.overallRemarks) {
-    y = checkPageBreak(doc, y, 16, pageNum);
+    y = checkPageBreak(doc, y, 18, pageNum);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(60, 60, 60);
+    doc.setTextColor(40, 40, 40);
     doc.text("Overall Remarks", MARGIN + 2, y + 5);
-    y += 7;
+    y += 10; // clear gap between heading and content
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(50, 50, 50);
+    doc.setTextColor(35, 35, 35);
     const lines = doc.splitTextToSize(
       submission.overallRemarks,
       CONTENT_WIDTH - 4,

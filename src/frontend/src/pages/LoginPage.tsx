@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [logoError, setLogoError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,11 +34,23 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <Card className="shadow-lg border">
           <CardHeader className="pb-0 pt-8 flex flex-col items-center gap-3">
-            <img
-              src="/assets/uploads/Transparent_Circular_Oho_Shawarma_Logo-1.png"
-              alt="Oho Shawarma Logo"
-              className="w-24 h-24 object-contain"
-            />
+            <div className="w-[250px] h-[250px] flex items-center justify-center flex-shrink-0">
+              {!logoError ? (
+                <img
+                  src="/assets/uploads/Logo_Dashboard-1.png"
+                  alt="Oho Shawarma Logo"
+                  width={250}
+                  height={250}
+                  style={{ display: "block" }}
+                  className="w-[250px] h-[250px] object-contain"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <div className="w-[250px] h-[250px] rounded-2xl bg-[#361e14] flex items-center justify-center">
+                  <span className="text-[#fdbc0c] font-bold text-5xl">OS</span>
+                </div>
+              )}
+            </div>
             <div className="text-center">
               <h1 className="font-display font-bold text-2xl text-foreground">
                 Oho Shawarma
@@ -61,7 +74,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  data-ocid="login.email_input"
+                  data-ocid="login.input"
                   className="h-10"
                 />
               </div>
@@ -77,7 +90,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  data-ocid="login.password_input"
+                  data-ocid="login.input"
                   className="h-10"
                 />
               </div>

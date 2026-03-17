@@ -123,99 +123,6 @@ const SEED_OUTLETS: Array<{ name: string; code: string; isTest: boolean }> = [
   { name: "Test Outlet", code: "TEST001", isTest: true },
 ];
 
-const SAMPLE_AUDITS: Omit<AuditReport, "id">[] = [
-  {
-    outletName: "Vashi",
-    auditorName: "Rahul Sharma",
-    date: "2025-11-15",
-    score: 92,
-    status: "pass",
-    notes: "Excellent hygiene standards. All SOPs followed.",
-    isSample: true,
-  },
-  {
-    outletName: "Andheri",
-    auditorName: "Priya Patel",
-    date: "2025-11-22",
-    score: 78,
-    status: "pass",
-    notes: "Minor cleanliness issues in storage area. Addressed on spot.",
-    isSample: true,
-  },
-  {
-    outletName: "Chembur",
-    auditorName: "Rahul Sharma",
-    date: "2025-12-03",
-    score: 55,
-    status: "fail",
-    notes: "Temperature logs missing. Refrigeration below standard.",
-    isSample: true,
-  },
-  {
-    outletName: "New Panvel",
-    auditorName: "Meera Joshi",
-    date: "2025-12-10",
-    score: 88,
-    status: "pass",
-    notes: "Good overall. Staff training up to date.",
-    isSample: true,
-  },
-  {
-    outletName: "Kalyan",
-    auditorName: "Priya Patel",
-    date: "2025-12-18",
-    score: 63,
-    status: "pass",
-    notes: "Adequate. Food safety certifications need renewal next month.",
-    isSample: true,
-  },
-  {
-    outletName: "Kothrud",
-    auditorName: "Arjun Nair",
-    date: "2026-01-05",
-    score: 95,
-    status: "pass",
-    notes: "Outstanding performance. Recommend as benchmark outlet.",
-    isSample: true,
-  },
-  {
-    outletName: "Ghatkopar",
-    auditorName: "Meera Joshi",
-    date: "2026-01-14",
-    score: 47,
-    status: "fail",
-    notes: "Critical violations found. Pest control required immediately.",
-    isSample: true,
-  },
-  {
-    outletName: "Dombivli",
-    auditorName: "Rahul Sharma",
-    date: "2026-01-28",
-    score: 81,
-    status: "pass",
-    notes: "Satisfactory. Kitchen equipment servicing due.",
-    isSample: true,
-  },
-  {
-    outletName: "Hinjewadi",
-    auditorName: "Arjun Nair",
-    date: "2026-02-07",
-    score: 73,
-    status: "pass",
-    notes: "Staff uniforms non-compliant. Menu display updated.",
-    isSample: true,
-  },
-  {
-    outletName: "Nerul Sec 23",
-    auditorName: "Priya Patel",
-    date: "2026-02-20",
-    score: 98,
-    status: "pass",
-    notes: "Perfect score. Model outlet for the quarter.",
-    isSample: true,
-  },
-];
-
 const AUDIT_SECTIONS_TEMPLATE: Array<{
   id: string;
   title: string;
@@ -519,14 +426,16 @@ export function deleteOutlet(id: string): void {
 function initAudits(): AuditReport[] {
   const raw = localStorage.getItem(AUDITS_KEY);
   if (!raw) {
-    const audits: AuditReport[] = SAMPLE_AUDITS.map((a) => ({
-      ...a,
-      id: crypto.randomUUID(),
-    }));
-    localStorage.setItem(AUDITS_KEY, JSON.stringify(audits));
-    return audits;
+    localStorage.setItem(AUDITS_KEY, JSON.stringify([]));
+    return [];
   }
-  return JSON.parse(raw) as AuditReport[];
+  const all = JSON.parse(raw) as AuditReport[];
+  // Auto-remove any sample data
+  const nonSample = all.filter((a) => !a.isSample);
+  if (nonSample.length !== all.length) {
+    localStorage.setItem(AUDITS_KEY, JSON.stringify(nonSample));
+  }
+  return nonSample;
 }
 
 export function getAuditReports(): AuditReport[] {
@@ -548,12 +457,19 @@ export function deleteAuditReport(id: string): void {
 }
 
 export function clearSampleData(): void {
-  // Remove sample audits
   saveAudits(getAuditReports().filter((r) => !r.isSample));
-  // Remove sample submissions
   saveSubmissions(getAuditSubmissions().filter((s) => !s.isSample));
-  // Remove test outlet
   saveOutlets(getAllOutlets().filter((o) => !o.isTest));
+}
+
+// Remove all audit data linked to the Test Outlet
+export function clearTestOutletData(): void {
+  const testOutlets = getAllOutlets().filter((o) => o.isTest);
+  const testNames = new Set(testOutlets.map((o) => o.name));
+  saveAudits(getAuditReports().filter((r) => !testNames.has(r.outletName)));
+  saveSubmissions(
+    getAuditSubmissions().filter((s) => !testNames.has(s.outletName)),
+  );
 }
 
 // ---- Audit Submissions ----
@@ -564,7 +480,13 @@ function initSubmissions(): AuditSubmission[] {
     localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify([]));
     return [];
   }
-  return JSON.parse(raw) as AuditSubmission[];
+  const all = JSON.parse(raw) as AuditSubmission[];
+  // Auto-remove any sample data
+  const nonSample = all.filter((s) => !s.isSample);
+  if (nonSample.length !== all.length) {
+    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(nonSample));
+  }
+  return nonSample;
 }
 
 function saveSubmissions(submissions: AuditSubmission[]): void {

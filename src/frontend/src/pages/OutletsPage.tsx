@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import {
   type Outlet,
+  clearTestOutletData,
   createOutlet,
   deactivateOutlet,
   deleteOutlet,
@@ -46,6 +47,7 @@ import {
   ArrowUpAZ,
   ChevronDown,
   ChevronUp,
+  Eraser,
   Pencil,
   PlusCircle,
   PowerOff,
@@ -86,6 +88,9 @@ export default function OutletsPage() {
 
   // Delete confirm (test only)
   const [deleteTarget, setDeleteTarget] = useState<Outlet | null>(null);
+
+  // Remove Test Data confirm
+  const [clearTestTarget, setClearTestTarget] = useState<Outlet | null>(null);
 
   const handleAdd = () => {
     if (!addForm.name || !addForm.code) {
@@ -132,6 +137,13 @@ export default function OutletsPage() {
     refresh();
     setDeleteTarget(null);
     toast.success("Test outlet deleted.");
+  };
+
+  const handleClearTestData = () => {
+    if (!clearTestTarget) return;
+    clearTestOutletData();
+    setClearTestTarget(null);
+    toast.success("All test data removed successfully.");
   };
 
   return (
@@ -192,7 +204,7 @@ export default function OutletsPage() {
         <div className="border rounded-lg overflow-hidden">
           <Table data-ocid="outlets.table">
             <TableHeader>
-              <TableRow className="bg-muted/40">
+              <TableRow className="bg-[#fdbc0c]/15">
                 <TableHead className="font-semibold">Name</TableHead>
                 <TableHead className="font-semibold">Code</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
@@ -249,16 +261,28 @@ export default function OutletsPage() {
                         <PowerOff className="w-3.5 h-3.5" />
                       </Button>
                       {outlet.isTest && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          data-ocid={`outlets.delete_button.${idx + 1}`}
-                          onClick={() => setDeleteTarget(outlet)}
-                          className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                          title="Delete (Test Outlet)"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-ocid={`outlets.clear_test_button.${idx + 1}`}
+                            onClick={() => setClearTestTarget(outlet)}
+                            className="h-8 w-8 hover:bg-amber-500/10 hover:text-amber-600"
+                            title="Remove Test Data"
+                          >
+                            <Eraser className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-ocid={`outlets.delete_button.${idx + 1}`}
+                            onClick={() => setDeleteTarget(outlet)}
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete Test Outlet"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </TableCell>
@@ -469,6 +493,37 @@ export default function OutletsPage() {
               className="bg-orange-500 text-white hover:bg-orange-600"
             >
               Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Test Data Confirm */}
+      <AlertDialog
+        open={!!clearTestTarget}
+        onOpenChange={(o) => !o && setClearTestTarget(null)}
+      >
+        <AlertDialogContent data-ocid="outlets.clear_test_dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">
+              Remove Test Data
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all audit records submitted for{" "}
+              <strong>{clearTestTarget?.name}</strong> from the beginning. The
+              outlet itself will remain. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-ocid="outlets.clear_test_dialog.cancel_button">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-ocid="outlets.clear_test_dialog.confirm_button"
+              onClick={handleClearTestData}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              Remove Test Data
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

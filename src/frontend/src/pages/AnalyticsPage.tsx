@@ -8,6 +8,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,8 @@ import {
   Activity,
   BarChart2,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Store,
   TrendingUp,
   X,
@@ -30,7 +33,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  LabelList,
   Legend,
   Line,
   LineChart,
@@ -41,19 +43,24 @@ import {
   YAxis,
 } from "recharts";
 
+// ---- Color Palette ----
+const BRAND_YELLOW = "#fdbc0c";
 const TIER_COLORS = {
-  excellent: "hsl(142 71% 45%)",
-  good: "hsl(217 91% 60%)",
-  needsImprovement: "hsl(38 92% 50%)",
-  critical: "hsl(0 72% 51%)",
+  excellent: "#22c55e",
+  good: "#3b82f6",
+  needsImprovement: "#f59e0b",
+  critical: "#ef4444",
 };
 
-const HYGIENE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(217 91% 60%)",
-  "hsl(142 71% 45%)",
-  "hsl(38 92% 50%)",
-  "hsl(0 72% 51%)",
+// Flat colorful palette for section/hygiene bars
+const FLAT_COLORS = [
+  "#fdbc0c", // brand yellow
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f97316", // orange
+  "#8b5cf6", // violet
+  "#06b6d4", // cyan
+  "#ec4899", // pink
 ];
 
 function scoreTier(
@@ -65,6 +72,16 @@ function scoreTier(
   return "critical";
 }
 
+const SECTION_IDS = [
+  "shop-exterior",
+  "kitchen-floors-walls",
+  "equipment-cleanliness",
+  "other-operations",
+  "food-handling-safety",
+  "employee-hygiene",
+  "raw-material-compliance",
+];
+
 const SECTION_SHORT: Record<string, string> = {
   "shop-exterior": "Shop Exterior",
   "kitchen-floors-walls": "Kitchen Floors",
@@ -75,69 +92,138 @@ const SECTION_SHORT: Record<string, string> = {
   "raw-material-compliance": "Raw Material",
 };
 
-const pieChartConfig: ChartConfig = {
-  excellent: { label: "Excellent (90-100%)", color: TIER_COLORS.excellent },
-  good: { label: "Good (75-89%)", color: TIER_COLORS.good },
-  needsImprovement: {
-    label: "Needs Improvement (60-74%)",
-    color: TIER_COLORS.needsImprovement,
+const HYGIENE_CATEGORIES = [
+  {
+    name: "Outlet Hygiene",
+    key: "outlet-hygiene",
+    sectionIds: ["shop-exterior"],
   },
-  critical: { label: "Critical (<60%)", color: TIER_COLORS.critical },
-};
+  {
+    name: "Cleaning Compliance",
+    key: "cleaning-compliance",
+    sectionIds: [
+      "kitchen-floors-walls",
+      "equipment-cleanliness",
+      "other-operations",
+    ],
+  },
+  {
+    name: "Food Hygiene",
+    key: "food-hygiene",
+    sectionIds: ["food-handling-safety"],
+  },
+  {
+    name: "Employee Hygiene",
+    key: "employee-hygiene",
+    sectionIds: ["employee-hygiene"],
+  },
+  {
+    name: "Raw Material",
+    key: "raw-material",
+    sectionIds: ["raw-material-compliance"],
+  },
+];
 
-const sectionChartConfig: ChartConfig = {
-  score: { label: "Avg Score %", color: "hsl(var(--primary))" },
-};
+type DrillDown =
+  | { type: "tier"; key: string; label: string }
+  | { type: "section"; key: string; label: string }
+  | { type: "hygiene"; key: string; label: string };
 
-const hygieneChartConfig: ChartConfig = {
-  score: { label: "Score %", color: "hsl(var(--primary))" },
-};
+interface DrillOutlet {
+  name: string;
+  score: number;
+  count: number;
+}
+
+function scoreRing(score: number) {
+  if (score >= 90) return "bg-green-500";
+  if (score >= 75) return "bg-blue-500";
+  if (score >= 60) return "bg-amber-500";
+  return "bg-red-500";
+}
+
+function DrillDownPanel({
+  drillDown,
+  outlets,
+  onClose,
+}: {
+  drillDown: DrillDown;
+  outlets: DrillOutlet[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="border rounded-lg bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+            Outlet breakdown
+          </p>
+          <p className="font-semibold text-sm mt-0.5">{drillDown.label}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={onClose}
+          data-ocid="analytics.drill_down.close_button"
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      {outlets.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          No outlets found for this selection.
+        </p>
+      ) : (
+        <ScrollArea className="max-h-64">
+          <div className="space-y-2 pr-2">
+            {outlets.map((o, idx) => (
+              <div
+                key={o.name}
+                className="flex items-center gap-3 py-1.5 px-2 rounded-md hover:bg-muted/40 transition-colors"
+              >
+                <span className="text-xs text-muted-foreground w-5 text-right font-mono">
+                  {idx + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{o.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {o.count} audit{o.count !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${scoreRing(o.score)}`}
+                      style={{ width: `${o.score}%` }}
+                    />
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      o.score >= 90
+                        ? "text-green-600 dark:text-green-400"
+                        : o.score >= 75
+                          ? "text-blue-600 dark:text-blue-400"
+                          : o.score >= 60
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {o.score}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
 
 const trendChartConfig: ChartConfig = {
-  score: { label: "Avg Compliance %", color: "hsl(var(--primary))" },
+  score: { label: "Avg Compliance %", color: BRAND_YELLOW },
 };
-
-function BarLabel(props: {
-  x?: number;
-  y?: number;
-  width?: number;
-  value?: number;
-}) {
-  const { x = 0, y = 0, width = 0, value = 0 } = props;
-  if (!value) return null;
-  return (
-    <text
-      x={x + width / 2}
-      y={y - 4}
-      fill="currentColor"
-      textAnchor="middle"
-      fontSize={10}
-      className="fill-foreground"
-    >
-      {value}%
-    </text>
-  );
-}
-
-function ClipboardIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-    </svg>
-  );
-}
 
 export default function AnalyticsPage() {
   const [allReports, setAllReports] = useState(() => getAuditReports());
@@ -148,6 +234,7 @@ export default function AnalyticsPage() {
   const [filterAuditor, setFilterAuditor] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
 
   // Auto-update when new audits are submitted
   useEffect(() => {
@@ -273,24 +360,20 @@ export default function AnalyticsPage() {
       map[r.outletName].count++;
     }
     return Object.entries(map)
-      .map(([name, d]) => ({ name, score: Math.round(d.total / d.count) }))
+      .map(([name, d]) => ({
+        name,
+        score: Math.round(d.total / d.count),
+        count: d.count,
+      }))
       .sort((a, b) => b.score - a.score);
   }, [filteredReports]);
 
-  const outletChartWidth = Math.max(600, outletPerformance.length * 80);
-
-  const outletChartConfig: ChartConfig = useMemo(() => {
-    const cfg: ChartConfig = {};
-    for (const o of outletPerformance) {
-      cfg[o.name] = { label: o.name, color: "hsl(var(--primary))" };
-    }
-    return cfg;
-  }, [outletPerformance]);
+  const outletChartWidth = Math.max(600, outletPerformance.length * 85);
 
   // Chart 3: Section Performance
   const sectionPerformance = useMemo(() => {
     if (filteredSubmissions.length === 0) return [];
-    return Object.keys(SECTION_SHORT).map((id) => {
+    return SECTION_IDS.map((id) => {
       const scores = filteredSubmissions
         .map((s) => s.sectionScores?.[id])
         .filter((v): v is number => v !== undefined && v !== null);
@@ -304,32 +387,20 @@ export default function AnalyticsPage() {
 
   // Chart 4: Hygiene Compliance
   const hygieneData = useMemo(() => {
-    const avg = (ids: string[]) => {
+    return HYGIENE_CATEGORIES.map((cat) => {
       const allScores: number[] = [];
       for (const s of filteredSubmissions) {
-        for (const id of ids) {
+        for (const id of cat.sectionIds) {
           const v = s.sectionScores?.[id];
           if (v !== undefined && v !== null) allScores.push(v);
         }
       }
-      return allScores.length > 0
-        ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
-        : 0;
-    };
-    return [
-      { name: "Outlet Hygiene", score: avg(["shop-exterior"]) },
-      {
-        name: "Cleaning Compliance",
-        score: avg([
-          "kitchen-floors-walls",
-          "equipment-cleanliness",
-          "other-operations",
-        ]),
-      },
-      { name: "Food Hygiene", score: avg(["food-handling-safety"]) },
-      { name: "Employee Hygiene", score: avg(["employee-hygiene"]) },
-      { name: "Raw Material", score: avg(["raw-material-compliance"]) },
-    ];
+      const avg =
+        allScores.length > 0
+          ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+          : 0;
+      return { name: cat.name, score: avg, key: cat.key };
+    });
   }, [filteredSubmissions]);
 
   // Chart 5: Trend Over Time
@@ -354,13 +425,87 @@ export default function AnalyticsPage() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredSubmissions, filteredReports]);
 
+  // ---- Drill-down data ----
+  const drillOutlets = useMemo((): DrillOutlet[] => {
+    if (!drillDown) return [];
+
+    if (drillDown.type === "tier") {
+      const map: Record<string, { total: number; count: number }> = {};
+      for (const r of filteredReports) {
+        if (!map[r.outletName]) map[r.outletName] = { total: 0, count: 0 };
+        map[r.outletName].total += r.score;
+        map[r.outletName].count++;
+      }
+      return Object.entries(map)
+        .map(([name, d]) => ({
+          name,
+          score: Math.round(d.total / d.count),
+          count: d.count,
+        }))
+        .filter((o) => scoreTier(o.score) === drillDown.key)
+        .sort((a, b) => a.score - b.score);
+    }
+
+    if (drillDown.type === "section") {
+      const sectionId = drillDown.key;
+      const map: Record<string, { total: number; count: number }> = {};
+      for (const s of filteredSubmissions) {
+        const score = s.sectionScores?.[sectionId];
+        if (score === undefined || score === null) continue;
+        if (!map[s.outletName]) map[s.outletName] = { total: 0, count: 0 };
+        map[s.outletName].total += score;
+        map[s.outletName].count++;
+      }
+      return Object.entries(map)
+        .map(([name, d]) => ({
+          name,
+          score: Math.round(d.total / d.count),
+          count: d.count,
+        }))
+        .sort((a, b) => a.score - b.score);
+    }
+
+    if (drillDown.type === "hygiene") {
+      const cat = HYGIENE_CATEGORIES.find((c) => c.key === drillDown.key);
+      if (!cat) return [];
+      const map: Record<string, { total: number; count: number }> = {};
+      for (const s of filteredSubmissions) {
+        const scores: number[] = [];
+        for (const id of cat.sectionIds) {
+          const v = s.sectionScores?.[id];
+          if (v !== undefined && v !== null) scores.push(v);
+        }
+        if (scores.length === 0) continue;
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        if (!map[s.outletName]) map[s.outletName] = { total: 0, count: 0 };
+        map[s.outletName].total += avg;
+        map[s.outletName].count++;
+      }
+      return Object.entries(map)
+        .map(([name, d]) => ({
+          name,
+          score: Math.round(d.total / d.count),
+          count: d.count,
+        }))
+        .sort((a, b) => a.score - b.score);
+    }
+
+    return [];
+  }, [drillDown, filteredReports, filteredSubmissions]);
+
+  const openDrill = (type: DrillDown["type"], key: string, label: string) => {
+    setDrillDown((prev) =>
+      prev?.type === type && prev?.key === key ? null : { type, key, label },
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="font-display font-semibold text-lg flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-primary" />
+            <BarChart2 className="w-5 h-5" style={{ color: BRAND_YELLOW }} />
             Analytics Dashboard
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -466,37 +611,34 @@ export default function AnalyticsPage() {
             label: "Total Audits",
             value: totalAudits,
             suffix: "",
-            icon: <ClipboardIcon />,
-            colorClass: "text-foreground",
+            icon: <BarChart2 className="w-4 h-4" />,
+            color: "#3b82f6",
           },
           {
             label: "Average Score",
             value: avgScore,
             suffix: "%",
             icon: <Activity className="w-4 h-4" />,
-            colorClass:
+            color:
               avgScore >= 75
-                ? "text-green-600 dark:text-green-400"
+                ? "#22c55e"
                 : avgScore >= 60
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-red-600 dark:text-red-400",
+                  ? "#f59e0b"
+                  : "#ef4444",
           },
           {
             label: "Pass Rate",
             value: passRate,
             suffix: "%",
             icon: <CheckCircle2 className="w-4 h-4" />,
-            colorClass:
-              passRate >= 75
-                ? "text-green-600 dark:text-green-400"
-                : "text-amber-600 dark:text-amber-400",
+            color: passRate >= 75 ? "#22c55e" : "#f59e0b",
           },
           {
             label: "Outlets Audited",
             value: outletsAudited,
             suffix: "",
             icon: <Store className="w-4 h-4" />,
-            colorClass: "text-foreground",
+            color: BRAND_YELLOW,
           },
         ].map((kpi, i) => (
           <Card
@@ -511,7 +653,8 @@ export default function AnalyticsPage() {
                     {kpi.label}
                   </p>
                   <p
-                    className={`font-display font-bold text-2xl mt-1 ${kpi.colorClass}`}
+                    className="font-display font-bold text-2xl mt-1"
+                    style={{ color: kpi.color }}
                   >
                     {kpi.value}
                     {kpi.suffix && (
@@ -521,7 +664,13 @@ export default function AnalyticsPage() {
                     )}
                   </p>
                 </div>
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <div
+                  className="p-2 rounded-lg"
+                  style={{
+                    backgroundColor: `${kpi.color}20`,
+                    color: kpi.color,
+                  }}
+                >
                   {kpi.icon}
                 </div>
               </div>
@@ -551,18 +700,35 @@ export default function AnalyticsPage() {
           <Card className="border" data-ocid="analytics.compliance_pie.card">
             <CardHeader className="pb-2">
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
+                <TrendingUp
+                  className="w-4 h-4"
+                  style={{ color: BRAND_YELLOW }}
+                />
                 Compliance Score Distribution
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Audit outcomes by tier
+                Click a slice to see outlets in that tier
               </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               {tierCounts.length > 0 ? (
                 <ChartContainer
-                  config={pieChartConfig}
-                  className="h-[280px] w-full"
+                  config={{
+                    excellent: {
+                      label: "Excellent (90-100%)",
+                      color: TIER_COLORS.excellent,
+                    },
+                    good: { label: "Good (75-89%)", color: TIER_COLORS.good },
+                    needsImprovement: {
+                      label: "Needs Improvement (60-74%)",
+                      color: TIER_COLORS.needsImprovement,
+                    },
+                    critical: {
+                      label: "Critical (<60%)",
+                      color: TIER_COLORS.critical,
+                    },
+                  }}
+                  className="h-[260px] w-full"
                 >
                   <PieChart>
                     <Pie
@@ -571,14 +737,30 @@ export default function AnalyticsPage() {
                       nameKey="label"
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
-                      label={({ label, percent }) =>
-                        `${label}: ${Math.round((percent ?? 0) * 100)}%`
+                      outerRadius={95}
+                      cursor="pointer"
+                      onClick={(entry) =>
+                        openDrill("tier", entry.name, entry.label)
                       }
-                      labelLine={false}
                     >
                       {tierCounts.map((entry) => (
-                        <Cell key={entry.name} fill={entry.fill} />
+                        <Cell
+                          key={entry.name}
+                          fill={entry.fill}
+                          opacity={
+                            drillDown?.type === "tier" &&
+                            drillDown.key !== entry.name
+                              ? 0.4
+                              : 1
+                          }
+                          stroke={
+                            drillDown?.type === "tier" &&
+                            drillDown.key === entry.name
+                              ? "#fff"
+                              : "transparent"
+                          }
+                          strokeWidth={2}
+                        />
                       ))}
                     </Pie>
                     <Tooltip
@@ -591,40 +773,52 @@ export default function AnalyticsPage() {
                   </PieChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+                <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">
                   No data
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2 mt-3">
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   {
                     label: "Excellent",
                     range: "90-100%",
                     color: "bg-green-500",
-                    tierName: "excellent",
+                    key: "excellent",
                   },
                   {
                     label: "Good",
                     range: "75-89%",
                     color: "bg-blue-500",
-                    tierName: "good",
+                    key: "good",
                   },
                   {
                     label: "Needs Improvement",
                     range: "60-74%",
                     color: "bg-amber-500",
-                    tierName: "needsImprovement",
+                    key: "needsImprovement",
                   },
                   {
                     label: "Critical",
                     range: "<60%",
                     color: "bg-red-500",
-                    tierName: "critical",
+                    key: "critical",
                   },
                 ].map((tier) => (
-                  <div
+                  <button
+                    type="button"
                     key={tier.label}
-                    className="flex items-center gap-2 text-xs"
+                    onClick={() =>
+                      openDrill(
+                        "tier",
+                        tier.key,
+                        `${tier.label} (${tier.range})`,
+                      )
+                    }
+                    className={`flex items-center gap-2 text-xs rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60 text-left ${
+                      drillDown?.type === "tier" && drillDown.key === tier.key
+                        ? "bg-muted"
+                        : ""
+                    }`}
                   >
                     <span
                       className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${tier.color}`}
@@ -633,12 +827,24 @@ export default function AnalyticsPage() {
                       {tier.label} ({tier.range}):
                     </span>
                     <span className="font-semibold">
-                      {tierCounts.find((t) => t.name === tier.tierName)
-                        ?.value ?? 0}
+                      {tierCounts.find((t) => t.name === tier.key)?.value ?? 0}
                     </span>
-                  </div>
+                    {drillDown?.type === "tier" &&
+                    drillDown.key === tier.key ? (
+                      <ChevronUp className="w-3 h-3 ml-auto" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 ml-auto opacity-40" />
+                    )}
+                  </button>
                 ))}
               </div>
+              {drillDown?.type === "tier" && (
+                <DrillDownPanel
+                  drillDown={drillDown}
+                  outlets={drillOutlets}
+                  onClose={() => setDrillDown(null)}
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -646,7 +852,10 @@ export default function AnalyticsPage() {
           <Card className="border" data-ocid="analytics.trend.card">
             <CardHeader className="pb-2">
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
+                <TrendingUp
+                  className="w-4 h-4"
+                  style={{ color: BRAND_YELLOW }}
+                />
                 Audit Trend Over Time
               </CardTitle>
               <p className="text-xs text-muted-foreground">
@@ -686,9 +895,9 @@ export default function AnalyticsPage() {
                     <Line
                       type="monotone"
                       dataKey="score"
-                      stroke="hsl(var(--primary))"
+                      stroke={BRAND_YELLOW}
                       strokeWidth={2.5}
-                      dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                      dot={{ r: 4, fill: BRAND_YELLOW }}
                       activeDot={{ r: 6 }}
                     />
                   </LineChart>
@@ -708,19 +917,24 @@ export default function AnalyticsPage() {
           >
             <CardHeader className="pb-2">
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
-                <BarChart2 className="w-4 h-4 text-primary" />
+                <BarChart2
+                  className="w-4 h-4"
+                  style={{ color: BRAND_YELLOW }}
+                />
                 Section Performance
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Average compliance per audit section
+                Click a bar to see outlet breakdown for that section
               </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               {sectionPerformance.length > 0 &&
               filteredSubmissions.length > 0 ? (
                 <ChartContainer
-                  config={sectionChartConfig}
-                  className="h-[300px] w-full"
+                  config={{
+                    score: { label: "Avg Score %", color: BRAND_YELLOW },
+                  }}
+                  className="h-[280px] w-full"
                 >
                   <BarChart
                     data={sectionPerformance}
@@ -739,23 +953,49 @@ export default function AnalyticsPage() {
                       interval={0}
                     />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-                    <ChartTooltip
-                      content={<ChartTooltipContent />}
+                    <Tooltip
                       formatter={(v) => [`${v}%`, "Avg Score"]}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        fontSize: 12,
+                      }}
                     />
                     <Bar
                       dataKey="score"
-                      fill="hsl(var(--primary))"
                       radius={[4, 4, 0, 0]}
+                      cursor="pointer"
+                      onClick={(entry) =>
+                        openDrill("section", entry.id, entry.name)
+                      }
                     >
-                      <LabelList dataKey="score" content={<BarLabel />} />
+                      {sectionPerformance.map((entry, index) => (
+                        <Cell
+                          key={entry.id}
+                          fill={FLAT_COLORS[index % FLAT_COLORS.length]}
+                          opacity={
+                            drillDown?.type === "section" &&
+                            drillDown.key !== entry.id
+                              ? 0.35
+                              : 1
+                          }
+                        />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
                   Submit audits to see section breakdown
                 </div>
+              )}
+              {drillDown?.type === "section" && (
+                <DrillDownPanel
+                  drillDown={drillDown}
+                  outlets={drillOutlets}
+                  onClose={() => setDrillDown(null)}
+                />
               )}
             </CardContent>
           </Card>
@@ -764,18 +1004,23 @@ export default function AnalyticsPage() {
           <Card className="border" data-ocid="analytics.hygiene.card">
             <CardHeader className="pb-2">
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
+                <CheckCircle2
+                  className="w-4 h-4"
+                  style={{ color: BRAND_YELLOW }}
+                />
                 Hygiene Compliance
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Average scores by hygiene category
+                Click a bar to see outlet breakdown by category
               </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               {filteredSubmissions.length > 0 ? (
                 <ChartContainer
-                  config={hygieneChartConfig}
-                  className="h-[300px] w-full"
+                  config={{
+                    score: { label: "Score %", color: BRAND_YELLOW },
+                  }}
+                  className="h-[280px] w-full"
                 >
                   <BarChart
                     data={hygieneData}
@@ -794,25 +1039,49 @@ export default function AnalyticsPage() {
                       interval={0}
                     />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-                    <ChartTooltip
-                      content={<ChartTooltipContent />}
+                    <Tooltip
                       formatter={(v) => [`${v}%`, "Score"]}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        fontSize: 12,
+                      }}
                     />
-                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                    <Bar
+                      dataKey="score"
+                      radius={[4, 4, 0, 0]}
+                      cursor="pointer"
+                      onClick={(entry) =>
+                        openDrill("hygiene", entry.key, entry.name)
+                      }
+                    >
                       {hygieneData.map((h, index) => (
                         <Cell
-                          key={h.name}
-                          fill={HYGIENE_COLORS[index % HYGIENE_COLORS.length]}
+                          key={h.key}
+                          fill={FLAT_COLORS[index % FLAT_COLORS.length]}
+                          opacity={
+                            drillDown?.type === "hygiene" &&
+                            drillDown.key !== h.key
+                              ? 0.35
+                              : 1
+                          }
                         />
                       ))}
-                      <LabelList dataKey="score" content={<BarLabel />} />
                     </Bar>
                   </BarChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
                   Submit audits to see hygiene compliance
                 </div>
+              )}
+              {drillDown?.type === "hygiene" && (
+                <DrillDownPanel
+                  drillDown={drillDown}
+                  outlets={drillOutlets}
+                  onClose={() => setDrillDown(null)}
+                />
               )}
             </CardContent>
           </Card>
@@ -824,13 +1093,19 @@ export default function AnalyticsPage() {
           >
             <CardHeader className="pb-2">
               <CardTitle className="font-display font-semibold text-base flex items-center gap-2">
-                <Store className="w-4 h-4 text-primary" />
+                <Store className="w-4 h-4" style={{ color: BRAND_YELLOW }} />
                 Outlet Performance Comparison
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Average compliance score per outlet
+                Average compliance score per outlet &mdash; ranked highest to
+                lowest
                 {outletPerformance.length > 8 && (
-                  <span className="ml-2 text-primary">(scroll to see all)</span>
+                  <span
+                    className="ml-2 font-medium"
+                    style={{ color: BRAND_YELLOW }}
+                  >
+                    (scroll right to see all)
+                  </span>
                 )}
               </p>
             </CardHeader>
@@ -839,7 +1114,9 @@ export default function AnalyticsPage() {
                 <div className="overflow-x-auto">
                   <div style={{ minWidth: `${outletChartWidth}px` }}>
                     <ChartContainer
-                      config={outletChartConfig}
+                      config={{
+                        score: { label: "Avg Score %", color: BRAND_YELLOW },
+                      }}
                       className="h-[320px] w-full"
                     >
                       <BarChart
@@ -864,7 +1141,12 @@ export default function AnalyticsPage() {
                           unit="%"
                         />
                         <Tooltip
-                          formatter={(v) => [`${v}%`, "Avg Score"]}
+                          formatter={(v, _name, props) => [
+                            `${v}%  (${props.payload?.count ?? 0} audit${
+                              props.payload?.count !== 1 ? "s" : ""
+                            })`,
+                            "Avg Score",
+                          ]}
                           contentStyle={{
                             backgroundColor: "hsl(var(--background))",
                             border: "1px solid hsl(var(--border))",
@@ -887,7 +1169,6 @@ export default function AnalyticsPage() {
                               }
                             />
                           ))}
-                          <LabelList dataKey="score" content={<BarLabel />} />
                         </Bar>
                       </BarChart>
                     </ChartContainer>

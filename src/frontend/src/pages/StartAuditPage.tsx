@@ -7,9 +7,14 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -28,8 +33,15 @@ import {
   getOutlets,
   getSession,
 } from "@/lib/store";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, ImagePlus, Loader2, X } from "lucide-react";
+import {
+  CalendarIcon,
+  CheckCircle2,
+  ImagePlus,
+  Loader2,
+  X,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -86,6 +98,8 @@ export default function StartAuditPage() {
     undefined,
   );
   const [auditDate, setAuditDate] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const selectedOutlet = outlets.find((o) => o.id === selectedOutletId);
 
@@ -171,12 +185,50 @@ export default function StartAuditPage() {
     );
   };
 
-  const handleImageUpload = (sectionId: string, itemId: string, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      updateItemImage(sectionId, itemId, e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 1024;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height * MAX) / width);
+            width = MAX;
+          } else {
+            width = Math.round((width * MAX) / height);
+            height = MAX;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas not supported"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
+  const handleImageUpload = async (
+    sectionId: string,
+    itemId: string,
+    file: File,
+  ) => {
+    try {
+      const compressed = await compressImage(file);
+      updateItemImage(sectionId, itemId, compressed);
+    } catch {
+      toast.error("Failed to process image. Please try another photo.");
+    }
   };
 
   const totalItems = sections.reduce((acc, s) => acc + s.items.length, 0);
@@ -224,6 +276,8 @@ export default function StartAuditPage() {
       toast.error(
         `Please complete the following before submitting: ${missing.join(", ")}.`,
       );
+      // Scroll to top so user can see the toast
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -244,7 +298,10 @@ export default function StartAuditPage() {
       });
 
       toast.success(`Audit ${submission.auditId} submitted successfully!`);
-      navigate({ to: `/audit-summary/${submission.id}` });
+      navigate({ to: "/audit-summary/$id", params: { id: submission.id } });
+    } catch (err) {
+      console.error("Submission failed:", err);
+      toast.error("Submission failed. Please try again or reduce photo sizes.");
     } finally {
       setSubmitting(false);
     }
@@ -274,7 +331,7 @@ export default function StartAuditPage() {
               <SelectTrigger data-ocid="start_audit.outlet.select">
                 <SelectValue placeholder="Choose an outlet..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-72 overflow-y-auto">
                 {outlets.map((outlet) => (
                   <SelectItem key={outlet.id} value={outlet.id}>
                     {outlet.name}
@@ -562,30 +619,58 @@ export default function StartAuditPage() {
             </div>
           </div>
 
-          {/* Date */}
+          {/* Date Picker */}
           <div className="space-y-2 max-w-xs">
-            <Label htmlFor="audit-date">Date</Label>
-            <Input
-              id="audit-date"
-              type="text"
-              placeholder="DD/MM/YYYY"
-              value={auditDate}
-              onChange={(e) => setAuditDate(e.target.value)}
-              data-ocid="audit_summary.date.input"
-            />
+            <Label>Date</Label>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  data-ocid="audit_summary.date.input"
+                  className={cn(
+                    "w-full flex items-center justify-start gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                    !auditDate && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarIcon className="h-4 w-4 shrink-0" />
+                  {auditDate ? auditDate : "Pick a date"}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    if (date) {
+                      const day = String(date.getDate()).padStart(2, "0");
+                      const month = String(date.getMonth() + 1).padStart(
+                        2,
+                        "0",
+                      );
+                      const year = date.getFullYear();
+                      setAuditDate(`${day}/${month}/${year}`);
+                    }
+                    setDatePickerOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </CardContent>
       </Card>
 
       {/* Submit */}
       <div className="flex items-center justify-between gap-4 pb-6">
-        <Button
-          variant="outline"
+        <button
+          type="button"
           data-ocid="start_audit.cancel_button"
           onClick={() => setStep(1)}
+          className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
         >
           Back
-        </Button>
+        </button>
         <Button
           className="gap-2 min-w-[160px]"
           disabled={submitting}

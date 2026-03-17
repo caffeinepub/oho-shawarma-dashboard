@@ -50,7 +50,7 @@ function AuditorDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-l-4 border-[#fdbc0c] pl-4">
         <h2 className="font-display font-bold text-2xl">
           Welcome back, {session?.name} 👋
         </h2>
@@ -65,8 +65,8 @@ function AuditorDashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               My Total Audits
             </CardTitle>
-            <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center">
-              <ClipboardList className="w-5 h-5 text-primary" />
+            <div className="w-9 h-9 rounded-lg bg-[#fdbc0c] flex items-center justify-center">
+              <ClipboardList className="w-5 h-5 text-[#361e14]" />
             </div>
           </CardHeader>
           <CardContent>
@@ -117,7 +117,7 @@ function AuditorDashboard() {
           ) : (
             <Table data-ocid="auditor.recent_audits.table">
               <TableHeader>
-                <TableRow className="bg-muted/40">
+                <TableRow className="bg-[#fdbc0c]/15">
                   <TableHead className="font-semibold">Outlet</TableHead>
                   <TableHead className="font-semibold">Date</TableHead>
                   <TableHead className="font-semibold">Score</TableHead>
@@ -206,7 +206,7 @@ function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-l-4 border-[#fdbc0c] pl-4">
         <h2 className="font-display font-bold text-2xl">
           Welcome back, {session?.name} 👋
         </h2>
@@ -222,8 +222,8 @@ function AdminDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.label}
               </CardTitle>
-              <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center">
-                <stat.icon className="w-5 h-5 text-primary" />
+              <div className="w-9 h-9 rounded-lg bg-[#fdbc0c] flex items-center justify-center">
+                <stat.icon className="w-5 h-5 text-[#361e14]" />
               </div>
             </CardHeader>
             <CardContent>
