@@ -430,8 +430,11 @@ export default function AnalyticsPage() {
     if (!drillDown) return [];
 
     if (drillDown.type === "tier") {
+      const inTier = filteredReports.filter(
+        (r) => scoreTier(r.score) === drillDown.key,
+      );
       const map: Record<string, { total: number; count: number }> = {};
-      for (const r of filteredReports) {
+      for (const r of inTier) {
         if (!map[r.outletName]) map[r.outletName] = { total: 0, count: 0 };
         map[r.outletName].total += r.score;
         map[r.outletName].count++;
@@ -442,7 +445,6 @@ export default function AnalyticsPage() {
           score: Math.round(d.total / d.count),
           count: d.count,
         }))
-        .filter((o) => scoreTier(o.score) === drillDown.key)
         .sort((a, b) => a.score - b.score);
     }
 

@@ -16,6 +16,14 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+const SIDEBAR_BG = "#361e14";
+const SIDEBAR_ACTIVE_BG = "#fdbc0c";
+const SIDEBAR_ACTIVE_TEXT = "#361e14";
+const SIDEBAR_TEXT = "#ffffff";
+const SIDEBAR_TEXT_DIM = "rgba(255,255,255,0.65)";
+const _SIDEBAR_HOVER_BG = "rgba(253,188,12,0.15)";
+const SIDEBAR_BORDER = "rgba(255,255,255,0.1)";
+
 const adminNavItems = [
   {
     path: "/dashboard",
@@ -91,7 +99,6 @@ export default function Layout() {
       saved !== null
         ? saved === "true"
         : document.documentElement.classList.contains("dark");
-    // Apply persisted preference immediately on mount
     document.documentElement.classList.toggle("dark", isDark);
     return isDark;
   });
@@ -115,21 +122,33 @@ export default function Layout() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-5 py-6 border-b border-sidebar-border">
+      {/* Logo & Brand */}
+      <div
+        className="flex items-center gap-3 px-5 py-6"
+        style={{ borderBottom: `1px solid ${SIDEBAR_BORDER}` }}
+      >
         <img
           src="/assets/uploads/Logo_small-1.png"
           alt="Oho Shawarma"
           className="w-10 h-10 object-contain flex-shrink-0"
         />
         <div>
-          <p className="font-display font-bold text-sm text-sidebar-foreground leading-tight">
+          <p
+            className="font-display font-bold text-sm leading-tight"
+            style={{ color: SIDEBAR_TEXT }}
+          >
             Oho Shawarma
           </p>
-          <p className="text-xs text-sidebar-foreground/60 leading-tight">
+          <p
+            className="text-xs leading-tight"
+            style={{ color: SIDEBAR_TEXT_DIM }}
+          >
             Auditing Dashboard
           </p>
         </div>
       </div>
+
+      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
           const active = location.pathname === item.path;
@@ -142,11 +161,28 @@ export default function Layout() {
                 navigate({ to: item.path });
                 setMobileOpen(false);
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all ${
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }`}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all"
+              style={{
+                backgroundColor: active ? SIDEBAR_ACTIVE_BG : "transparent",
+                color: active ? SIDEBAR_ACTIVE_TEXT : SIDEBAR_TEXT,
+                fontWeight: active ? 600 : 500,
+              }}
+              onMouseEnter={(e) => {
+                if (!active) {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                    SIDEBAR_ACTIVE_BG;
+                  (e.currentTarget as HTMLButtonElement).style.color =
+                    SIDEBAR_ACTIVE_TEXT;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!active) {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                    "transparent";
+                  (e.currentTarget as HTMLButtonElement).style.color =
+                    SIDEBAR_TEXT;
+                }
+              }}
             >
               <item.icon className="w-4 h-4 flex-shrink-0" />
               {item.label}
@@ -154,16 +190,33 @@ export default function Layout() {
           );
         })}
       </nav>
-      <div className="px-3 py-4 border-t border-sidebar-border">
+
+      {/* User & Logout */}
+      <div
+        className="px-3 py-4"
+        style={{ borderTop: `1px solid ${SIDEBAR_BORDER}` }}
+      >
         <div className="flex items-center gap-2 px-3 py-2 mb-2">
-          <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{
+              backgroundColor: SIDEBAR_ACTIVE_BG,
+              color: SIDEBAR_ACTIVE_TEXT,
+            }}
+          >
             {session?.name?.[0]?.toUpperCase() ?? "A"}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-sidebar-foreground truncate">
+            <p
+              className="text-xs font-semibold truncate"
+              style={{ color: SIDEBAR_TEXT }}
+            >
               {session?.name}
             </p>
-            <p className="text-xs text-sidebar-foreground/50 truncate capitalize">
+            <p
+              className="text-xs truncate capitalize"
+              style={{ color: SIDEBAR_TEXT_DIM }}
+            >
               {session?.role}
             </p>
           </div>
@@ -172,7 +225,19 @@ export default function Layout() {
           type="button"
           data-ocid="sidebar.logout_button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground/70 hover:bg-red-500/10 hover:text-red-400 transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all"
+          style={{ color: SIDEBAR_TEXT_DIM }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+              "rgba(239,68,68,0.15)";
+            (e.currentTarget as HTMLButtonElement).style.color = "#fca5a5";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+              "transparent";
+            (e.currentTarget as HTMLButtonElement).style.color =
+              SIDEBAR_TEXT_DIM;
+          }}
         >
           <LogOut className="w-4 h-4" />
           Logout
@@ -183,10 +248,15 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="hidden md:flex w-64 flex-col bg-sidebar flex-shrink-0">
+      {/* Desktop Sidebar */}
+      <aside
+        className="hidden md:flex w-64 flex-col flex-shrink-0"
+        style={{ backgroundColor: SIDEBAR_BG }}
+      >
         <SidebarContent />
       </aside>
 
+      {/* Mobile Sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
@@ -197,12 +267,16 @@ export default function Layout() {
             onClick={() => setMobileOpen(false)}
             onKeyDown={(e) => e.key === "Escape" && setMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-64 bg-sidebar flex flex-col">
+          <aside
+            className="absolute left-0 top-0 h-full w-64 flex flex-col"
+            style={{ backgroundColor: SIDEBAR_BG }}
+          >
             <SidebarContent />
           </aside>
         </div>
       )}
 
+      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex items-center justify-between px-4 md:px-6 h-14 border-b bg-card flex-shrink-0">
           <div className="flex items-center gap-3">
