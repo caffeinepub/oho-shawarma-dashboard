@@ -253,7 +253,10 @@ export default function UsersPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="Edit"
                       >
-                        <Pencil className="w-3.5 h-3.5 icon-brand" />
+                        <Pencil
+                          className="w-3.5 h-3.5 icon-brand"
+                          data-light-icon="pencil"
+                        />
                       </Button>
                       <Button
                         variant="ghost"
@@ -267,7 +270,10 @@ export default function UsersPage() {
                         className="h-8 w-8 hover:bg-accent"
                         title="Reset Password"
                       >
-                        <KeyRound className="w-3.5 h-3.5 icon-brand" />
+                        <KeyRound
+                          className="w-3.5 h-3.5 icon-brand"
+                          data-light-icon="key"
+                        />
                       </Button>
                       {user.id !== session?.userId && (
                         <>
@@ -280,7 +286,10 @@ export default function UsersPage() {
                               className="h-8 w-8 hover:bg-orange-500/10 hover:text-orange-500"
                               title="Deactivate"
                             >
-                              <PowerOff className="w-3.5 h-3.5 icon-brand" />
+                              <PowerOff
+                                className="w-3.5 h-3.5 icon-brand"
+                                data-light-icon="deactivate"
+                              />
                             </Button>
                           ) : (
                             <Button
@@ -302,7 +311,10 @@ export default function UsersPage() {
                             className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5 icon-brand" />
+                            <Trash2
+                              className="w-3.5 h-3.5 icon-brand"
+                              data-light-icon="trash"
+                            />
                           </Button>
                         </>
                       )}

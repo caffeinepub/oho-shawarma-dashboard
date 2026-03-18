@@ -66,6 +66,7 @@ export interface AuditSubmission {
   managerSignature?: string;
   managerName?: string;
   auditDate?: string;
+  fireExtinguisherExpiryDate?: string;
 }
 
 export interface Session {

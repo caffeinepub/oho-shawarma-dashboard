@@ -101,6 +101,7 @@ export default function StartAuditPage() {
   const [managerName, setManagerName] = useState("");
   const [auditDate, setAuditDate] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [fireExtExpiryDate, setFireExtExpiryDate] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const selectedOutlet = outlets.find((o) => o.id === selectedOutletId);
@@ -288,6 +289,7 @@ export default function StartAuditPage() {
         managerSignature,
         managerName,
         auditDate,
+        fireExtinguisherExpiryDate: fireExtExpiryDate,
       });
 
       toast.success(`Audit ${submission.auditId} submitted successfully!`);
@@ -539,6 +541,23 @@ export default function StartAuditPage() {
                             />
                           </div>
                         )}
+                        {item.label ===
+                          "Fire extinguisher available and within validity date" && (
+                          <div className="mt-2 space-y-1">
+                            <Label className="text-sm font-semibold">
+                              Fire Extinguisher Expiry Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={fireExtExpiryDate}
+                              onChange={(e) =>
+                                setFireExtExpiryDate(e.target.value)
+                              }
+                              className="mt-1 max-w-xs"
+                              data-ocid="start_audit.fire_ext_expiry.input"
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -599,6 +618,12 @@ export default function StartAuditPage() {
           {/* Signatures */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div data-ocid="audit_summary.auditor_signature.canvas_target">
+              <p
+                className="text-sm font-medium mb-1"
+                style={{ color: "#361e14" }}
+              >
+                {session?.name}
+              </p>
               <SignaturePad
                 label="Auditor Signature *"
                 onChange={setAuditorSignature}

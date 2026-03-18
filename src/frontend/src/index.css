@@ -132,8 +132,8 @@
 
 /* Brand button - adapts for dark mode */
 .btn-brand {
-  background-color: #361e14 !important;
-  color: #ffffff !important;
+  background-color: #fdbc0c !important;
+  color: #361e14 !important;
 }
 .dark .btn-brand {
   background-color: oklch(0.269 0 0) !important;
@@ -166,4 +166,21 @@
 }
 :root:not(.dark) .tr-brand-header {
   background-color: #fdbc0c !important;
+}
+
+/* Light-mode icon colors */
+:root:not(.dark) [data-light-icon="key"] {
+  color: #22c55e !important;
+}
+:root:not(.dark) [data-light-icon="pencil"] {
+  color: #3b82f6 !important;
+}
+:root:not(.dark) [data-light-icon="eraser"] {
+  color: #a855f7 !important;
+}
+:root:not(.dark) [data-light-icon="trash"] {
+  color: #ef4444 !important;
+}
+:root:not(.dark) [data-light-icon="deactivate"] {
+  color: #6b7280 !important;
 }

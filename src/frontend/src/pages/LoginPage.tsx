@@ -30,10 +30,32 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        background:
+          "linear-gradient(135deg, #361e14 0%, #5c3520 40%, #fdbc0c 100%)",
+      }}
+    >
       <div className="w-full max-w-sm">
-        <Card className="shadow-lg border">
+        <Card
+          className="border-0 rounded-2xl overflow-hidden"
+          style={{
+            boxShadow:
+              "0 25px 60px rgba(54,30,20,0.4), 0 0 40px rgba(253,188,12,0.15)",
+            background: "white",
+          }}
+        >
           <CardHeader className="pb-0 pt-8 flex flex-col items-center gap-3">
+            <div
+              style={{
+                height: "4px",
+                background: "linear-gradient(90deg, #361e14, #fdbc0c)",
+                borderRadius: "2px",
+                width: "100%",
+                marginBottom: "8px",
+              }}
+            />
             <div className="w-[250px] h-[250px] flex items-center justify-center flex-shrink-0">
               {!logoError ? (
                 <img
@@ -52,7 +74,10 @@ export default function LoginPage() {
               )}
             </div>
             <div className="text-center">
-              <h1 className="font-display font-bold text-2xl text-foreground">
+              <h1
+                className="font-display font-bold text-2xl"
+                style={{ color: "#361e14" }}
+              >
                 Oho Shawarma
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
@@ -109,7 +134,12 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
                 data-ocid="login.submit_button"
-                className="w-full h-10 font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+                className="w-full h-10 font-semibold"
+                style={{
+                  background: "linear-gradient(90deg, #361e14, #5c3520)",
+                  color: "white",
+                  boxShadow: "0 4px 15px rgba(54,30,20,0.3)",
+                }}
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -119,13 +149,17 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p
+          className="text-center text-xs mt-6"
+          style={{ color: "rgba(253,188,12,0.8)" }}
+        >
           © {new Date().getFullYear()}. Built with love using{" "}
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-foreground transition-colors"
+            className="underline hover:opacity-100 transition-opacity"
+            style={{ color: "#fdbc0c" }}
           >
             caffeine.ai
           </a>

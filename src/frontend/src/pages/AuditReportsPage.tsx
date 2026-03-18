@@ -1,5 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -22,10 +28,12 @@ import {
   clearSampleData,
   getAuditReports,
   getAuditSubmissionById,
+  getAuditSubmissions,
   loadImagesForSubmission,
 } from "@/lib/store";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  CalendarDays,
   ChevronDown,
   ChevronUp,
   ClipboardList,
@@ -64,6 +72,7 @@ export default function AuditReportsPage() {
     getAuditReports(),
   );
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [showExpiryModal, setShowExpiryModal] = useState(false);
 
   const refresh = () => setReports(getAuditReports());
 
@@ -95,6 +104,23 @@ export default function AuditReportsPage() {
       setDownloadingId(null);
     }
   };
+
+  // Expiry dates data
+  const expiryEntries = useMemo(() => {
+    return getAuditSubmissions()
+      .filter(
+        (s) =>
+          s.fireExtinguisherExpiryDate &&
+          s.fireExtinguisherExpiryDate.trim() !== "",
+      )
+      .map((s) => ({
+        outletName: s.outletName,
+        parameterName: "Fire extinguisher",
+        expiryDate: s.fireExtinguisherExpiryDate as string,
+        submittedAt: s.submittedAt,
+      }))
+      .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+  }, []);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -225,18 +251,31 @@ export default function AuditReportsPage() {
             )}
           </p>
         </div>
-        {hasSampleData && (
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            data-ocid="audit.delete_button"
-            onClick={handleClearSample}
-            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+            data-ocid="audit.expiry_dates.button"
+            onClick={() => setShowExpiryModal(true)}
+            className="gap-2"
+            style={{ borderColor: "#fdbc0c", color: "#361e14" }}
           >
-            <Trash2 className="w-4 h-4" />
-            Clear Sample &amp; Test Data
+            <CalendarDays className="w-4 h-4" />
+            Expiry Dates
           </Button>
-        )}
+          {hasSampleData && (
+            <Button
+              variant="outline"
+              size="sm"
+              data-ocid="audit.delete_button"
+              onClick={handleClearSample}
+              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear Sample &amp; Test Data
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter / Search Bar */}
@@ -376,7 +415,7 @@ export default function AuditReportsPage() {
                     Auditor
                   </TableHead>
                   <TableHead
-                    className="font-semibold cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    className="font-semibold cursor-pointer select-none whitespace-nowrap th-brand"
                     onClick={() => handleSort("date")}
                   >
                     <span className="flex items-center gap-1">
@@ -384,7 +423,7 @@ export default function AuditReportsPage() {
                     </span>
                   </TableHead>
                   <TableHead
-                    className="font-semibold cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    className="font-semibold cursor-pointer select-none whitespace-nowrap th-brand"
                     onClick={() => handleSort("score")}
                   >
                     <span className="flex items-center gap-1">
@@ -520,6 +559,71 @@ export default function AuditReportsPage() {
           )}
         </div>
       )}
+
+      {/* Expiry Dates Modal */}
+      <Dialog open={showExpiryModal} onOpenChange={setShowExpiryModal}>
+        <DialogContent
+          data-ocid="audit.expiry_dates.dialog"
+          className="sm:max-w-lg"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <CalendarDays className="w-5 h-5" style={{ color: "#361e14" }} />
+              Fire Extinguisher Expiry Dates
+            </DialogTitle>
+          </DialogHeader>
+          {expiryEntries.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>No expiry dates recorded yet.</p>
+              <p className="text-xs mt-1">
+                Expiry dates are captured when auditors fill the fire
+                extinguisher parameter.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="tr-brand-header">
+                    <TableHead className="th-brand font-semibold">
+                      Outlet Name
+                    </TableHead>
+                    <TableHead className="th-brand font-semibold">
+                      Parameter
+                    </TableHead>
+                    <TableHead className="th-brand font-semibold">
+                      Expiry Date
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expiryEntries.map((entry, idx) => (
+                    <TableRow
+                      key={`${entry.outletName}-${entry.expiryDate}-${idx}`}
+                      data-ocid={`audit.expiry.item.${idx + 1}`}
+                    >
+                      <TableCell className="font-medium">
+                        {entry.outletName}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {entry.parameterName}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="border-amber-400 text-amber-700 dark:text-amber-400"
+                        >
+                          {entry.expiryDate}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
