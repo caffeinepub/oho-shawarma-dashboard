@@ -101,6 +101,7 @@ export default function LoginPage() {
                   autoComplete="email"
                   data-ocid="login.input"
                   className="h-10"
+                  style={{ color: "#000000" }}
                 />
               </div>
               <div className="space-y-1.5">
@@ -117,6 +118,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   data-ocid="login.input"
                   className="h-10"
+                  style={{ color: "#000000" }}
                 />
               </div>
 

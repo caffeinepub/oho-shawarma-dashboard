@@ -617,23 +617,29 @@ export default function StartAuditPage() {
 
           {/* Signatures */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Auditor column: signature first, then name below */}
             <div data-ocid="audit_summary.auditor_signature.canvas_target">
-              <p
-                className="text-sm font-medium mb-1"
-                style={{ color: "#361e14" }}
-              >
-                {session?.name}
-              </p>
               <SignaturePad
                 label="Auditor Signature *"
                 onChange={setAuditorSignature}
               />
+              <p
+                className="text-sm font-medium mt-2"
+                style={{ color: "#361e14" }}
+              >
+                {session?.name}
+              </p>
             </div>
+            {/* Manager column: signature first, then name input below */}
             <div
               data-ocid="audit_summary.manager_signature.canvas_target"
               className="space-y-3"
             >
-              <div className="space-y-1">
+              <SignaturePad
+                label="Manager Signature *"
+                onChange={setManagerSignature}
+              />
+              <div className="space-y-1 mt-2">
                 <Label htmlFor="manager-name-input">Manager Name</Label>
                 <Input
                   id="manager-name-input"
@@ -643,10 +649,6 @@ export default function StartAuditPage() {
                   onChange={(e) => setManagerName(e.target.value)}
                 />
               </div>
-              <SignaturePad
-                label="Manager Signature *"
-                onChange={setManagerSignature}
-              />
             </div>
           </div>
 
