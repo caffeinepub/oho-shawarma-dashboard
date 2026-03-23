@@ -36,7 +36,7 @@ export interface AuditReport {
 export interface AuditItem {
   id: string;
   label: string;
-  value: "YES" | "NO" | "NA" | null;
+  value: number | "YES" | "NO" | "NA" | null;
   remarks: string;
   followUpAction?: string;
   imageBase64?: string;
@@ -47,6 +47,7 @@ export interface AuditSection {
   title: string;
   items: AuditItem[];
   allowImage?: boolean;
+  isStarRating?: boolean;
 }
 
 export interface AuditSubmission {
@@ -67,6 +68,11 @@ export interface AuditSubmission {
   managerName?: string;
   auditDate?: string;
   fireExtinguisherExpiryDate?: string;
+  ductHoodLastServiceDate?: string;
+  waterFilterLastServiceDate?: string;
+  visicoolerLastServiceDate?: string;
+  deepFreezerLastServiceDate?: string;
+  pestControlDate?: string;
 }
 
 export interface Session {
@@ -130,10 +136,12 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   id: string;
   title: string;
   labels: string[];
+  isStarRating?: boolean;
 }> = [
   {
     id: "shop-exterior",
     title: "Shop Exterior Audit",
+    isStarRating: true,
     labels: [
       "Signage is clean and lit",
       "Shop entrance and surrounding is clean",
@@ -144,6 +152,7 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   {
     id: "kitchen-floors-walls",
     title: "Kitchen Floors and Walls",
+    isStarRating: true,
     labels: [
       "Live & Back Kitchen floor clean",
       "Live & Back Kitchen wall clean",
@@ -153,6 +162,7 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   {
     id: "equipment-cleanliness",
     title: "Equipment Cleanliness",
+    isStarRating: true,
     labels: [
       "Bain Marie Table clean and spill free",
       "Shawarma Machine clean and rust-free",
@@ -168,6 +178,7 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   {
     id: "other-operations",
     title: "Other Operations Cleanliness",
+    isStarRating: true,
     labels: [
       "Duct and Hood grease free",
       "Visicooler cooling and clean",
@@ -183,6 +194,7 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   {
     id: "food-handling-safety",
     title: "Food Handling and Safety",
+    isStarRating: true,
     labels: [
       "Food safety signages displayed in kitchen",
       "Approved storage containers and packaging used",
@@ -194,6 +206,7 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   {
     id: "employee-hygiene",
     title: "Employee Hygiene",
+    isStarRating: true,
     labels: [
       "Employees wearing clean uniform",
       "Employees wearing gloves while handling food",
@@ -206,6 +219,7 @@ const AUDIT_SECTIONS_TEMPLATE: Array<{
   {
     id: "raw-material-compliance",
     title: "Raw Material Brand Compliance",
+    isStarRating: false,
     labels: [
       "Eggless Mayo",
       "Cheese Jalapeno Sauce",
@@ -250,10 +264,27 @@ export const SECTION_WEIGHTS: Record<string, number> = {
   "raw-material-compliance": 0.05,
 };
 
-// Section Score = (YES + NA) / Total Parameters in section
+// Star rating conversion: 1→0%, 2→25%, 3→50%, 4→75%, 5→100%
+export function starToPercent(star: number): number {
+  return (star - 1) * 25;
+}
+
+// Section Score calculation
 export function calculateSectionScore(section: AuditSection): number {
   const total = section.items.length;
   if (total === 0) return 0;
+
+  if (section.isStarRating) {
+    const answered = section.items.filter((i) => typeof i.value === "number");
+    if (answered.length === 0) return 0;
+    const sum = answered.reduce(
+      (acc, i) => acc + starToPercent(i.value as number),
+      0,
+    );
+    return Math.round(sum / answered.length);
+  }
+
+  // YES/NO/NA logic for raw-material-compliance
   const compliant = section.items.filter(
     (i) => i.value === "YES" || i.value === "NA",
   ).length;
@@ -279,6 +310,7 @@ export function createDefaultAuditSections(): AuditSection[] {
   return AUDIT_SECTIONS_TEMPLATE.map((section) => ({
     id: section.id,
     title: section.title,
+    isStarRating: section.isStarRating ?? false,
     items: section.labels.map((label, i) => ({
       id: `${section.id}-item-${i}`,
       label,
@@ -618,6 +650,49 @@ export async function createAuditSubmission(
     sectionScores,
     score,
   };
+}
+
+export interface MaintenanceRow {
+  outletName: string;
+  fireExtinguisherExpiryDate?: string;
+  ductHoodLastServiceDate?: string;
+  waterFilterLastServiceDate?: string;
+  visicoolerLastServiceDate?: string;
+  deepFreezerLastServiceDate?: string;
+  pestControlDate?: string;
+}
+
+export function getMaintenanceTrackerData(): MaintenanceRow[] {
+  const submissions = getAuditSubmissions();
+  const byOutletAll = new Map<string, AuditSubmission[]>();
+  for (const s of submissions) {
+    const arr = byOutletAll.get(s.outletName) ?? [];
+    arr.push(s);
+    byOutletAll.set(s.outletName, arr);
+  }
+  const rows: MaintenanceRow[] = [];
+  for (const [outletName, allSubs] of byOutletAll) {
+    const sorted = [...allSubs].sort((a, b) =>
+      b.submittedAt.localeCompare(a.submittedAt),
+    );
+    const pick = (field: keyof AuditSubmission): string | undefined => {
+      for (const s of sorted) {
+        const v = s[field];
+        if (typeof v === "string" && v.trim()) return v;
+      }
+      return undefined;
+    };
+    rows.push({
+      outletName,
+      fireExtinguisherExpiryDate: pick("fireExtinguisherExpiryDate"),
+      ductHoodLastServiceDate: pick("ductHoodLastServiceDate"),
+      waterFilterLastServiceDate: pick("waterFilterLastServiceDate"),
+      visicoolerLastServiceDate: pick("visicoolerLastServiceDate"),
+      deepFreezerLastServiceDate: pick("deepFreezerLastServiceDate"),
+      pestControlDate: pick("pestControlDate"),
+    });
+  }
+  return rows.sort((a, b) => a.outletName.localeCompare(b.outletName));
 }
 
 // ---- Session ----

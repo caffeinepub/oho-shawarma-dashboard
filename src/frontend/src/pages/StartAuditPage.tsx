@@ -48,6 +48,40 @@ import { toast } from "sonner";
 
 type AnswerValue = "YES" | "NO" | "NA";
 
+const STAR_COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#16a34a"];
+
+function NaIcon({ selected }: { selected: boolean }) {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Not Applicable"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9.5"
+        stroke={selected ? "#4b5563" : "#d1d5db"}
+        strokeWidth="1.5"
+        fill={selected ? "#4b5563" : "none"}
+      />
+      <line
+        x1="5.5"
+        y1="5.5"
+        x2="18.5"
+        y2="18.5"
+        stroke={selected ? "#ffffff" : "#9ca3af"}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function AnswerButton({
   value,
   selected,
@@ -79,6 +113,64 @@ function AnswerButton({
   );
 }
 
+function StarRating({
+  value,
+  onChange,
+}: {
+  value: number | "NA" | null;
+  onChange: (v: number | "NA") => void;
+}) {
+  const isNA = value === "NA";
+  return (
+    <div className="flex items-center gap-0.5">
+      {/* NA icon before stars */}
+      <button
+        type="button"
+        onClick={() => onChange("NA")}
+        className="mr-1 rounded-full transition-colors flex-shrink-0"
+        title="Not Applicable"
+      >
+        <NaIcon selected={isNA} />
+      </button>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          style={
+            !isNA && typeof value === "number" && star <= value
+              ? { color: STAR_COLORS[star - 1] }
+              : undefined
+          }
+          className={`text-2xl leading-none transition-colors px-0.5 ${
+            !isNA && typeof value === "number" && star <= value
+              ? ""
+              : "text-muted-foreground/30 hover:text-muted-foreground/60"
+          }`}
+          title={`${star} star${star > 1 ? "s" : ""}`}
+        >
+          ★
+        </button>
+      ))}
+      {/* Show single digit when a star is selected */}
+      {!isNA && typeof value === "number" && (
+        <span
+          className="text-sm font-bold self-center ml-1.5"
+          style={{ color: STAR_COLORS[value - 1] }}
+        >
+          {value}
+        </span>
+      )}
+      {/* Show NA label when NA is selected */}
+      {isNA && (
+        <span className="text-xs font-semibold self-center ml-1.5 text-gray-500 dark:text-gray-400">
+          NA
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function StartAuditPage() {
   const navigate = useNavigate();
   const session = getSession();
@@ -89,6 +181,10 @@ export default function StartAuditPage() {
   const [sections, setSections] = useState<AuditSection[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Validation highlighting
+  const [missingKeys, setMissingKeys] = useState<Set<string>>(new Set());
+  const [openSections, setOpenSections] = useState<string[]>([]);
 
   // Audit Summary state
   const [overallRemarks, setOverallRemarks] = useState("");
@@ -102,20 +198,27 @@ export default function StartAuditPage() {
   const [auditDate, setAuditDate] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [fireExtExpiryDate, setFireExtExpiryDate] = useState("");
+  const [ductHoodServiceDate, setDuctHoodServiceDate] = useState("");
+  const [waterFilterServiceDate, setWaterFilterServiceDate] = useState("");
+  const [visicoolerServiceDate, setVisicoolerServiceDate] = useState("");
+  const [deepFreezerServiceDate, setDeepFreezerServiceDate] = useState("");
+  const [pestControlDate, setPestControlDate] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const selectedOutlet = outlets.find((o) => o.id === selectedOutletId);
 
   const handleStartAudit = () => {
     if (!selectedOutletId) return;
-    setSections(createDefaultAuditSections());
+    const defaultSections = createDefaultAuditSections();
+    setSections(defaultSections);
+    setOpenSections(defaultSections.map((s) => s.id));
     setStep(2);
   };
 
   const updateItemValue = (
     sectionId: string,
     itemId: string,
-    value: AnswerValue,
+    value: number | AnswerValue,
   ) => {
     setSections((prev) =>
       prev.map((s) =>
@@ -129,6 +232,12 @@ export default function StartAuditPage() {
           : s,
       ),
     );
+    // Clear the missing highlight for this item
+    setMissingKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(`${sectionId}:${itemId}`);
+      return next;
+    });
   };
 
   const updateItemRemarks = (
@@ -194,7 +303,6 @@ export default function StartAuditPage() {
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        // No size cap -- preserve original resolution for quality
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
@@ -231,9 +339,7 @@ export default function StartAuditPage() {
   );
   const progressPct =
     totalItems > 0 ? Math.round((answeredItems / totalItems) * 100) : 0;
-  const allAnswered = answeredItems === totalItems && totalItems > 0;
 
-  // Live score using weighted formula
   const liveScore = sections.length > 0 ? calculateFinalScore(sections) : 0;
 
   const scoreColorClass =
@@ -253,23 +359,45 @@ export default function StartAuditPage() {
   const handleSubmit = async () => {
     if (!session || !selectedOutlet) return;
 
-    // Validation
-    const missing: string[] = [];
-    if (!allAnswered) {
-      const remaining = totalItems - answeredItems;
-      missing.push(
-        `${remaining} parameter${remaining !== 1 ? "s" : ""} unanswered`,
-      );
-    }
-    if (!overallRemarks.trim()) missing.push("Overall Remarks");
-    if (!auditorSignature) missing.push("Auditor Signature");
-    if (!managerSignature) missing.push("Manager Signature");
+    // Collect missing parameter keys with descriptive names
+    const newMissing = new Set<string>();
+    const missingLabels: string[] = [];
+    const sectionsWithMissing = new Set<string>();
 
-    if (missing.length > 0) {
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.value === null) {
+          const key = `${section.id}:${item.id}`;
+          newMissing.add(key);
+          missingLabels.push(`• ${section.title} > ${item.label}`);
+          sectionsWithMissing.add(section.id);
+        }
+      }
+    }
+
+    const summaryMissing: string[] = [];
+    if (!overallRemarks.trim()) summaryMissing.push("• Overall Remarks");
+    if (!auditorSignature) summaryMissing.push("• Auditor Signature");
+    if (!managerSignature) summaryMissing.push("• Manager Signature");
+    if (!fireExtExpiryDate)
+      summaryMissing.push("• Fire Extinguisher Expiry Date");
+
+    if (newMissing.size > 0 || summaryMissing.length > 0) {
+      setMissingKeys(newMissing);
+      // Force-expand all sections that have missing items
+      if (sectionsWithMissing.size > 0) {
+        setOpenSections((prev) => [
+          ...new Set([...prev, ...Array.from(sectionsWithMissing)]),
+        ]);
+      }
+      const allMissing = [...missingLabels, ...summaryMissing];
       toast.error(
-        `Please complete the following before submitting: ${missing.join(", ")}.`,
+        `Please complete the following before submitting:\n${allMissing.join("\n")}`,
+        {
+          duration: 6000,
+          style: { whiteSpace: "pre-line" },
+        },
       );
-      // Scroll to top so user can see the toast
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -290,6 +418,11 @@ export default function StartAuditPage() {
         managerName,
         auditDate,
         fireExtinguisherExpiryDate: fireExtExpiryDate,
+        ductHoodLastServiceDate: ductHoodServiceDate || undefined,
+        waterFilterLastServiceDate: waterFilterServiceDate || undefined,
+        visicoolerLastServiceDate: visicoolerServiceDate || undefined,
+        deepFreezerLastServiceDate: deepFreezerServiceDate || undefined,
+        pestControlDate: pestControlDate || undefined,
       });
 
       toast.success(`Audit ${submission.auditId} submitted successfully!`);
@@ -378,10 +511,42 @@ export default function StartAuditPage() {
         </CardContent>
       </Card>
 
+      {/* Rating legend */}
+      <div className="flex items-center gap-3 px-3 py-2 bg-muted/30 rounded-lg border text-xs text-muted-foreground">
+        <span className="font-semibold shrink-0">Rating Guide:</span>
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* NA guide */}
+          <span className="flex items-center gap-1">
+            <NaIcon selected={false} />
+            <span className="text-muted-foreground">= N/A</span>
+          </span>
+          {[1, 2, 3, 4, 5].map((s) => (
+            <span key={s} className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((pos) => (
+                <span
+                  key={pos}
+                  style={{ color: pos <= s ? STAR_COLORS[pos - 1] : undefined }}
+                  className={pos <= s ? "" : "text-muted-foreground/30"}
+                >
+                  ★
+                </span>
+              ))}
+              <span
+                className="font-bold text-sm"
+                style={{ color: STAR_COLORS[s - 1] }}
+              >
+                {s}
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Sections */}
       <Accordion
         type="multiple"
-        defaultValue={sections.map((s) => s.id)}
+        value={openSections}
+        onValueChange={setOpenSections}
         className="space-y-3"
       >
         {sections.map((section) => {
@@ -389,18 +554,29 @@ export default function StartAuditPage() {
           const total = section.items.length;
           const complete = answered === total;
           const sectionScore = calculateSectionScore(section);
+          const hasMissingInSection = section.items.some((item) =>
+            missingKeys.has(`${section.id}:${item.id}`),
+          );
           return (
             <AccordionItem
               key={section.id}
               value={section.id}
-              className="border rounded-lg overflow-hidden"
+              className={cn(
+                "border rounded-lg overflow-hidden",
+                hasMissingInSection ? "border-red-400" : "",
+              )}
             >
               <AccordionTrigger
                 data-ocid="start_audit.section.toggle"
                 className="px-4 py-3 hover:no-underline hover:bg-muted/30 [&[data-state=open]>svg]:rotate-180"
               >
                 <div className="flex items-center gap-3 flex-1">
-                  <span className="font-display font-semibold text-sm">
+                  <span
+                    className="font-display font-semibold text-sm"
+                    style={
+                      hasMissingInSection ? { color: "#dc2626" } : undefined
+                    }
+                  >
                     {section.title}
                   </span>
                   <Badge
@@ -433,27 +609,68 @@ export default function StartAuditPage() {
                 <div className="divide-y">
                   {section.items.map((item) => {
                     const imgKey = `${section.id}-${item.id}`;
+                    const showStarFollowUp =
+                      section.isStarRating &&
+                      typeof item.value === "number" &&
+                      item.value <= 3;
+                    const itemMissing = missingKeys.has(
+                      `${section.id}:${item.id}`,
+                    );
                     return (
                       <div
                         key={item.id}
-                        className="px-4 py-3 space-y-2"
+                        className={cn(
+                          "px-4 py-3 space-y-2",
+                          itemMissing
+                            ? "border-l-4 border-red-500 bg-red-50 dark:bg-red-950/20"
+                            : "",
+                        )}
                         data-ocid="start_audit.item.row"
                       >
                         <div className="flex items-start justify-between gap-4">
-                          <p className="text-sm font-medium flex-1">
+                          <p
+                            className="text-sm font-medium flex-1"
+                            style={
+                              itemMissing ? { color: "#dc2626" } : undefined
+                            }
+                          >
                             {item.label}
+                            {itemMissing && (
+                              <span className="ml-2 text-xs font-bold text-red-600">
+                                ⚠ Required
+                              </span>
+                            )}
                           </p>
-                          <div className="flex gap-1.5 flex-shrink-0">
-                            {(["YES", "NO", "NA"] as AnswerValue[]).map((v) => (
-                              <AnswerButton
-                                key={v}
-                                value={v}
-                                selected={item.value === v}
-                                onClick={() =>
+                          <div className="flex-shrink-0">
+                            {section.isStarRating ? (
+                              <StarRating
+                                value={
+                                  item.value === "NA"
+                                    ? "NA"
+                                    : typeof item.value === "number"
+                                      ? item.value
+                                      : null
+                                }
+                                onChange={(v) =>
                                   updateItemValue(section.id, item.id, v)
                                 }
                               />
-                            ))}
+                            ) : (
+                              <div className="flex gap-1.5">
+                                {(["YES", "NO", "NA"] as AnswerValue[]).map(
+                                  (v) => (
+                                    <AnswerButton
+                                      key={v}
+                                      value={v}
+                                      selected={item.value === v}
+                                      onClick={() =>
+                                        updateItemValue(section.id, item.id, v)
+                                      }
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2 items-start">
@@ -521,9 +738,11 @@ export default function StartAuditPage() {
                             )}
                           </div>
                         </div>
-                        {item.value === "NO" && (
+
+                        {/* Follow-up action for star sections: 1, 2, or 3 stars */}
+                        {showStarFollowUp && (
                           <div className="space-y-1">
-                            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                            <span className="text-xs font-bold text-red-600 dark:text-red-400">
                               Follow-up Action Required
                             </span>
                             <Textarea
@@ -541,11 +760,95 @@ export default function StartAuditPage() {
                             />
                           </div>
                         )}
+
+                        {/* Follow-up action for YES/NO/NA sections */}
+                        {!section.isStarRating && item.value === "NO" && (
+                          <div className="space-y-1">
+                            <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                              Follow-up Action Required
+                            </span>
+                            <Textarea
+                              placeholder="Describe the corrective action required..."
+                              value={item.followUpAction ?? ""}
+                              onChange={(e) =>
+                                updateItemFollowUpAction(
+                                  section.id,
+                                  item.id,
+                                  e.target.value,
+                                )
+                              }
+                              className="text-xs min-h-[60px] resize-none border-red-200 dark:border-red-900/50 focus-visible:ring-red-400"
+                              data-ocid="start_audit.item.textarea"
+                            />
+                          </div>
+                        )}
+
+                        {item.label === "Duct and Hood grease free" && (
+                          <div className="mt-2 space-y-1">
+                            <Label className="text-sm font-semibold">
+                              Last Service Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={ductHoodServiceDate}
+                              onChange={(e) =>
+                                setDuctHoodServiceDate(e.target.value)
+                              }
+                              className="mt-1 max-w-xs"
+                            />
+                          </div>
+                        )}
+                        {item.label === "Water Filter working" && (
+                          <div className="mt-2 space-y-1">
+                            <Label className="text-sm font-semibold">
+                              Last Service Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={waterFilterServiceDate}
+                              onChange={(e) =>
+                                setWaterFilterServiceDate(e.target.value)
+                              }
+                              className="mt-1 max-w-xs"
+                            />
+                          </div>
+                        )}
+                        {item.label === "Visicooler cooling and clean" && (
+                          <div className="mt-2 space-y-1">
+                            <Label className="text-sm font-semibold">
+                              Last Service Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={visicoolerServiceDate}
+                              onChange={(e) =>
+                                setVisicoolerServiceDate(e.target.value)
+                              }
+                              className="mt-1 max-w-xs"
+                            />
+                          </div>
+                        )}
+                        {item.label === "Deep Freezer hygienic" && (
+                          <div className="mt-2 space-y-1">
+                            <Label className="text-sm font-semibold">
+                              Last Service Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={deepFreezerServiceDate}
+                              onChange={(e) =>
+                                setDeepFreezerServiceDate(e.target.value)
+                              }
+                              className="mt-1 max-w-xs"
+                            />
+                          </div>
+                        )}
                         {item.label ===
                           "Fire extinguisher available and within validity date" && (
                           <div className="mt-2 space-y-1">
                             <Label className="text-sm font-semibold">
-                              Fire Extinguisher Expiry Date
+                              Fire Extinguisher Expiry Date{" "}
+                              <span className="text-destructive">*</span>
                             </Label>
                             <Input
                               type="date"
@@ -567,6 +870,30 @@ export default function StartAuditPage() {
           );
         })}
       </Accordion>
+
+      {/* PEST Section */}
+      <Card className="border" data-ocid="pest_section.card">
+        <CardHeader className="pb-4">
+          <CardTitle className="font-display font-bold text-base flex items-center gap-2">
+            <span className="w-2 h-5 rounded-sm bg-primary inline-block" />
+            PEST
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">
+              Next Pest Control Service Date
+            </Label>
+            <Input
+              type="date"
+              value={pestControlDate}
+              onChange={(e) => setPestControlDate(e.target.value)}
+              className="max-w-xs"
+              data-ocid="pest_section.date.input"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Audit Summary Section */}
       <Card className="border" data-ocid="audit_summary.card">
