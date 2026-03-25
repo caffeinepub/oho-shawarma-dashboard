@@ -23,8 +23,9 @@ import {
   ClipboardList,
   Download,
   Eye,
+  Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function scoreColor(score: number): string {
   if (score >= 80) return "text-green-600 dark:text-green-400";
@@ -33,12 +34,22 @@ function scoreColor(score: number): string {
 }
 
 export default function MyAuditReportsPage() {
-  const session = getSession();
   const navigate = useNavigate();
-  const [audits] = useState<AuditSubmission[]>(() =>
-    session ? getMyAuditSubmissions(session.userId) : [],
-  );
+  const [audits, setAudits] = useState<AuditSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    const session = getSession();
+    if (session) {
+      getMyAuditSubmissions(session.userId).then((data) => {
+        setAudits(data);
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
 
   const sorted = [...audits].sort(
     (a, b) =>
@@ -48,13 +59,23 @@ export default function MyAuditReportsPage() {
   const handleDownload = async (audit: AuditSubmission) => {
     setDownloading(audit.id);
     try {
-      // Load images from IndexedDB before generating PDF
       const auditWithImages = await loadImagesForSubmission(audit);
       await generateAuditPDF(auditWithImages);
     } finally {
       setDownloading(null);
     }
   };
+
+  if (loading) {
+    return (
+      <div
+        data-ocid="my_audits.loading_state"
+        className="flex justify-center items-center py-16"
+      >
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

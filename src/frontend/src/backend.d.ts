@@ -23,6 +23,16 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export interface StoredAuditSubmission {
+    id: string;
+    auditId: string;
+    outletName: string;
+    auditorId: string;
+    auditorName: string;
+    submittedAt: string;
+    score: bigint;
+    payload: string;
+}
 export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createOutlet(name: string, location: string): Promise<bigint>;
@@ -40,4 +50,9 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateOutlet(outletId: bigint, name: string, location: string): Promise<void>;
     updateUser(userPrincipal: Principal, name: string, email: string, role: string): Promise<void>;
+    submitAuditSubmission(sub: StoredAuditSubmission): Promise<void>;
+    getAllAuditSubmissions(): Promise<Array<StoredAuditSubmission>>;
+    getAuditSubmissionById(id: string): Promise<StoredAuditSubmission | null>;
+    deleteAuditSubmission(id: string): Promise<void>;
+    deleteAuditSubmissionsByOutlet(outletName: string): Promise<void>;
 }

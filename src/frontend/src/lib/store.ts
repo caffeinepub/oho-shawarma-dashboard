@@ -1,5 +1,17 @@
 // Frontend-only auth + data store using localStorage
+import { createActorWithConfig } from "@/config";
 import { deleteImagesBySubmission, getImage, saveImage } from "./imageDb";
+
+export interface StoredAuditSubmission {
+  id: string;
+  auditId: string;
+  outletName: string;
+  auditorId: string;
+  auditorName: string;
+  submittedAt: string;
+  score: bigint;
+  payload: string;
+}
 
 export interface User {
   id: string;
@@ -31,6 +43,7 @@ export interface AuditReport {
   notes: string;
   isSample: boolean;
   submissionId?: string;
+  auditId?: string;
 }
 
 export interface AuditItem {
@@ -82,11 +95,49 @@ export interface Session {
   role: "admin" | "auditor";
 }
 
+// Extended actor type that includes the new audit submission methods
+// (backend.ts is auto-generated and can't be directly modified)
+interface AuditBackend {
+  submitAuditSubmission(sub: StoredAuditSubmission): Promise<void>;
+  getAllAuditSubmissions(): Promise<Array<StoredAuditSubmission>>;
+  getAuditSubmissionById(id: string): Promise<StoredAuditSubmission | null>;
+  deleteAuditSubmission(id: string): Promise<void>;
+  deleteAuditSubmissionsByOutlet(outletName: string): Promise<void>;
+}
+
+// Singleton actor
+let _actor:
+  | (Awaited<ReturnType<typeof createActorWithConfig>> & AuditBackend)
+  | null = null;
+async function getActor() {
+  if (!_actor) {
+    const base = await createActorWithConfig();
+    _actor = base as typeof base & AuditBackend;
+  }
+  return _actor;
+}
+
+function serializeSubmission(sub: AuditSubmission): StoredAuditSubmission {
+  return {
+    id: sub.id,
+    auditId: sub.auditId,
+    outletName: sub.outletName,
+    auditorId: sub.auditorId,
+    auditorName: sub.auditorName,
+    submittedAt: sub.submittedAt,
+    score: BigInt(Math.round(sub.score)),
+    payload: JSON.stringify(sub),
+  };
+}
+
+function deserializeSubmission(stored: StoredAuditSubmission): AuditSubmission {
+  const sub = JSON.parse(stored.payload) as AuditSubmission;
+  return { ...sub, score: Number(stored.score) };
+}
+
 const USERS_KEY = "oho_users";
 const OUTLETS_KEY = "oho_outlets";
-const AUDITS_KEY = "oho_audits";
 const SESSION_KEY = "oho_session";
-const SUBMISSIONS_KEY = "oho_audit_submissions";
 
 const DEFAULT_ADMIN: User = {
   id: "default-admin",
@@ -94,6 +145,16 @@ const DEFAULT_ADMIN: User = {
   email: "info@ohoshawarma.com",
   password: "Oho@admin",
   role: "admin",
+  status: "active",
+  createdAt: new Date().toISOString(),
+};
+
+const DEFAULT_AUDITOR: User = {
+  id: "default-auditor-pravin",
+  name: "Pravin Dubey",
+  email: "ohoshawarma.auditor@ohoshawarma.com",
+  password: "Audit@oho2026",
+  role: "auditor",
   status: "active",
   createdAt: new Date().toISOString(),
 };
@@ -326,11 +387,17 @@ export function createDefaultAuditSections(): AuditSection[] {
 function initUsers(): User[] {
   const raw = localStorage.getItem(USERS_KEY);
   if (!raw) {
-    const users = [DEFAULT_ADMIN];
+    const users = [DEFAULT_ADMIN, DEFAULT_AUDITOR];
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
     return users;
   }
-  return JSON.parse(raw) as User[];
+  let users = JSON.parse(raw) as User[];
+  // Ensure default auditor always exists
+  if (!users.find((u) => u.id === "default-auditor-pravin")) {
+    users = [...users, DEFAULT_AUDITOR];
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }
+  return users;
 }
 
 export function getAllUsers(): User[] {
@@ -456,97 +523,76 @@ export function deleteOutlet(id: string): void {
   saveOutlets(getAllOutlets().filter((o) => o.id !== id));
 }
 
-// ---- Audit Reports ----
+// ---- Audit Submissions (backend-based) ----
 
-function initAudits(): AuditReport[] {
-  const raw = localStorage.getItem(AUDITS_KEY);
-  if (!raw) {
-    localStorage.setItem(AUDITS_KEY, JSON.stringify([]));
-    return [];
-  }
-  const all = JSON.parse(raw) as AuditReport[];
-  // Auto-remove any sample data
-  const nonSample = all.filter((a) => !a.isSample);
-  if (nonSample.length !== all.length) {
-    localStorage.setItem(AUDITS_KEY, JSON.stringify(nonSample));
-  }
-  return nonSample;
+export async function getAuditSubmissions(): Promise<AuditSubmission[]> {
+  const actor = await getActor();
+  const stored = await actor.getAllAuditSubmissions();
+  return stored.map(deserializeSubmission);
 }
 
-export function getAuditReports(): AuditReport[] {
-  return initAudits();
+export async function getMyAuditSubmissions(
+  auditorId: string,
+): Promise<AuditSubmission[]> {
+  const all = await getAuditSubmissions();
+  return all.filter((s) => s.auditorId === auditorId);
 }
 
-function saveAudits(audits: AuditReport[]): void {
-  localStorage.setItem(AUDITS_KEY, JSON.stringify(audits));
+export async function getAuditSubmissionById(
+  id: string,
+): Promise<AuditSubmission | undefined> {
+  const actor = await getActor();
+  const result = await actor.getAuditSubmissionById(id);
+  if (!result) return undefined;
+  return deserializeSubmission(result);
 }
 
-export function createAuditReport(data: Omit<AuditReport, "id">): AuditReport {
-  const report: AuditReport = { ...data, id: crypto.randomUUID() };
-  saveAudits([...getAuditReports(), report]);
-  return report;
+export async function getAuditReports(): Promise<AuditReport[]> {
+  const submissions = await getAuditSubmissions();
+  return submissions.map((sub) => ({
+    id: sub.id,
+    outletName: sub.outletName,
+    auditorName: sub.auditorName,
+    date: sub.auditDate || sub.submittedAt.slice(0, 10),
+    score: sub.score,
+    status: (sub.score >= 70 ? "pass" : "fail") as "pass" | "fail" | "pending",
+    notes: `Audit ${sub.auditId}`,
+    isSample: sub.isSample ?? false,
+    submissionId: sub.id,
+    auditId: sub.auditId,
+  }));
 }
 
-export function deleteAuditReport(id: string): void {
-  saveAudits(getAuditReports().filter((r) => r.id !== id));
+export async function getMaintenanceTrackerData(): Promise<MaintenanceRow[]> {
+  const submissions = await getAuditSubmissions();
+  const rows: MaintenanceRow[] = submissions.map((s) => ({
+    outletName: s.outletName,
+    auditDate: s.auditDate || s.submittedAt?.slice(0, 10) || undefined,
+    fireExtinguisherExpiryDate: s.fireExtinguisherExpiryDate || undefined,
+    ductHoodLastServiceDate: s.ductHoodLastServiceDate || undefined,
+    waterFilterLastServiceDate: s.waterFilterLastServiceDate || undefined,
+    visicoolerLastServiceDate: s.visicoolerLastServiceDate || undefined,
+    deepFreezerLastServiceDate: s.deepFreezerLastServiceDate || undefined,
+    pestControlDate: s.pestControlDate || undefined,
+  }));
+  return rows.sort((a, b) => {
+    const da = a.auditDate ?? "";
+    const db = b.auditDate ?? "";
+    return db.localeCompare(da);
+  });
 }
 
-export function clearSampleData(): void {
-  saveAudits(getAuditReports().filter((r) => !r.isSample));
-  saveSubmissions(getAuditSubmissions().filter((s) => !s.isSample));
-  saveOutlets(getAllOutlets().filter((o) => !o.isTest));
-}
-
-// Remove all audit data linked to the Test Outlet
 export async function clearTestOutletData(): Promise<void> {
   const testOutlets = getAllOutlets().filter((o) => o.isTest);
-  const testNames = new Set(testOutlets.map((o) => o.name));
-  const removedSubmissions = getAuditSubmissions().filter((s) =>
-    testNames.has(s.outletName),
-  );
-  saveAudits(getAuditReports().filter((r) => !testNames.has(r.outletName)));
-  saveSubmissions(
-    getAuditSubmissions().filter((s) => !testNames.has(s.outletName)),
-  );
-  // Clean up images for removed submissions
+  const actor = await getActor();
   await Promise.all(
-    removedSubmissions.map((s) => deleteImagesBySubmission(s.id)),
+    testOutlets.map((o) => actor.deleteAuditSubmissionsByOutlet(o.name)),
   );
 }
 
-// ---- Audit Submissions ----
-
-function initSubmissions(): AuditSubmission[] {
-  const raw = localStorage.getItem(SUBMISSIONS_KEY);
-  if (!raw) {
-    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify([]));
-    return [];
-  }
-  const all = JSON.parse(raw) as AuditSubmission[];
-  // Auto-remove any sample data
-  const nonSample = all.filter((s) => !s.isSample);
-  if (nonSample.length !== all.length) {
-    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(nonSample));
-  }
-  return nonSample;
-}
-
-function saveSubmissions(submissions: AuditSubmission[]): void {
-  localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(submissions));
-}
-
-export function getAuditSubmissions(): AuditSubmission[] {
-  return initSubmissions();
-}
-
-export function getMyAuditSubmissions(auditorId: string): AuditSubmission[] {
-  return initSubmissions().filter((s) => s.auditorId === auditorId);
-}
-
-export function getAuditSubmissionById(
-  id: string,
-): AuditSubmission | undefined {
-  return initSubmissions().find((s) => s.id === id);
+export async function deleteAuditReport(id: string): Promise<void> {
+  const actor = await getActor();
+  await actor.deleteAuditSubmission(id);
 }
 
 /**
@@ -573,7 +619,6 @@ export async function loadImagesForSubmission(
 
 /**
  * Save images from sections to IndexedDB and return sections with images stripped.
- * This keeps localStorage free of large base64 blobs.
  */
 async function saveImagesToDb(
   submissionId: string,
@@ -587,7 +632,6 @@ async function saveImagesToDb(
           if (item.imageBase64) {
             const key = `${submissionId}::${section.id}::${item.id}`;
             await saveImage(key, item.imageBase64);
-            // Return item without the base64 blob
             const { imageBase64: _, ...rest } = item;
             return rest as AuditItem;
           }
@@ -612,13 +656,12 @@ export async function createAuditSubmission(
   for (const section of data.sections) {
     sectionScores[section.id] = calculateSectionScore(section);
   }
-
   const score = calculateFinalScore(data.sections);
 
-  // Save images to IndexedDB and strip them from the localStorage entry
+  // Save images to IndexedDB and strip from payload
   const strippedSections = await saveImagesToDb(uuid, data.sections);
 
-  const submissionForStorage: AuditSubmission = {
+  const submission: AuditSubmission = {
     ...data,
     sections: strippedSections,
     id: uuid,
@@ -626,73 +669,24 @@ export async function createAuditSubmission(
     sectionScores,
     score,
   };
-  saveSubmissions([...getAuditSubmissions(), submissionForStorage]);
 
-  // Also create an AuditReport entry for admin view
-  const dateStr = dateObj.toISOString().split("T")[0];
-  createAuditReport({
-    outletName: data.outletName,
-    auditorName: data.auditorName,
-    date: dateStr,
-    score,
-    status: score >= 70 ? "pass" : "fail",
-    notes: `Audit ${auditId} submitted by ${data.auditorName}`,
-    isSample: false,
-    submissionId: uuid,
-  });
+  // Store in ICP backend canister (cross-device persistent)
+  const actor = await getActor();
+  await actor.submitAuditSubmission(serializeSubmission(submission));
 
-  // Return the full submission with images still in memory (for immediate use)
-  return {
-    ...data,
-    sections: data.sections,
-    id: uuid,
-    auditId,
-    sectionScores,
-    score,
-  };
+  // Return with full sections including images (for immediate use in current session)
+  return { ...submission, sections: data.sections, sectionScores, score };
 }
 
 export interface MaintenanceRow {
   outletName: string;
+  auditDate?: string;
   fireExtinguisherExpiryDate?: string;
   ductHoodLastServiceDate?: string;
   waterFilterLastServiceDate?: string;
   visicoolerLastServiceDate?: string;
   deepFreezerLastServiceDate?: string;
   pestControlDate?: string;
-}
-
-export function getMaintenanceTrackerData(): MaintenanceRow[] {
-  const submissions = getAuditSubmissions();
-  const byOutletAll = new Map<string, AuditSubmission[]>();
-  for (const s of submissions) {
-    const arr = byOutletAll.get(s.outletName) ?? [];
-    arr.push(s);
-    byOutletAll.set(s.outletName, arr);
-  }
-  const rows: MaintenanceRow[] = [];
-  for (const [outletName, allSubs] of byOutletAll) {
-    const sorted = [...allSubs].sort((a, b) =>
-      b.submittedAt.localeCompare(a.submittedAt),
-    );
-    const pick = (field: keyof AuditSubmission): string | undefined => {
-      for (const s of sorted) {
-        const v = s[field];
-        if (typeof v === "string" && v.trim()) return v;
-      }
-      return undefined;
-    };
-    rows.push({
-      outletName,
-      fireExtinguisherExpiryDate: pick("fireExtinguisherExpiryDate"),
-      ductHoodLastServiceDate: pick("ductHoodLastServiceDate"),
-      waterFilterLastServiceDate: pick("waterFilterLastServiceDate"),
-      visicoolerLastServiceDate: pick("visicoolerLastServiceDate"),
-      deepFreezerLastServiceDate: pick("deepFreezerLastServiceDate"),
-      pestControlDate: pick("pestControlDate"),
-    });
-  }
-  return rows.sort((a, b) => a.outletName.localeCompare(b.outletName));
 }
 
 // ---- Session ----
@@ -721,4 +715,11 @@ export function login(email: string, password: string): Session | null {
 
 export function logout(): void {
   localStorage.removeItem(SESSION_KEY);
+}
+
+// Legacy no-op for backward compat (was used before backend migration)
+export async function deleteImagesBySubmissionId(
+  submissionId: string,
+): Promise<void> {
+  await deleteImagesBySubmission(submissionId);
 }

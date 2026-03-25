@@ -179,4 +179,46 @@ actor {
       };
     };
   };
+
+  // ── Audit Submission Storage ──────────────────────────────────────────────
+  // All audit data is stored here so it is shared across all devices.
+  // No access control needed since the app uses its own email/password auth.
+
+  public type StoredAuditSubmission = {
+    id : Text;
+    auditId : Text;
+    outletName : Text;
+    auditorId : Text;
+    auditorName : Text;
+    submittedAt : Text;
+    score : Nat;
+    payload : Text; // Full JSON blob containing all section data
+  };
+
+  let auditSubmissions = Map.empty<Text, StoredAuditSubmission>();
+
+  public shared func submitAuditSubmission(sub : StoredAuditSubmission) : async () {
+    auditSubmissions.add(sub.id, sub);
+  };
+
+  public query func getAllAuditSubmissions() : async [StoredAuditSubmission] {
+    auditSubmissions.values().toArray();
+  };
+
+  public query func getAuditSubmissionById(id : Text) : async ?StoredAuditSubmission {
+    auditSubmissions.get(id);
+  };
+
+  public shared func deleteAuditSubmission(id : Text) : async () {
+    auditSubmissions.remove(id);
+  };
+
+  public shared func deleteAuditSubmissionsByOutlet(outletName : Text) : async () {
+    let all = auditSubmissions.values().toArray();
+    for (sub in all.vals()) {
+      if (sub.outletName == outletName) {
+        auditSubmissions.remove(sub.id);
+      };
+    };
+  };
 };

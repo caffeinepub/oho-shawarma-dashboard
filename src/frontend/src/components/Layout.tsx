@@ -13,6 +13,7 @@ import {
   Store,
   Sun,
   Users,
+  Wrench,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -71,6 +72,12 @@ const adminNavItems = [
     icon: BarChart2,
     ocid: "sidebar.analytics_link",
   },
+  {
+    path: "/maintenance-tracker",
+    label: "Maintenance Tracker",
+    icon: Wrench,
+    ocid: "sidebar.maintenance_tracker_link",
+  },
 ];
 
 const auditorNavItems = [
@@ -102,6 +109,7 @@ const pageTitles: Record<string, string> = {
   "/start-audit": "Start Audit",
   "/my-audits": "My Audit Reports",
   "/analytics": "Analytics",
+  "/maintenance-tracker": "Maintenance Tracker",
 };
 
 export default function Layout() {

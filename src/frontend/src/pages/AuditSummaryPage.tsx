@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { generateAuditPDF } from "@/lib/pdf";
 import {
+  type AuditSubmission,
   SECTION_WEIGHTS,
   getAuditSubmissionById,
   loadImagesForSubmission,
@@ -14,7 +15,7 @@ import {
   Download,
   Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const SECTION_LABELS: Record<string, string> = {
   "shop-exterior": "Shop Exterior Audit",
@@ -59,14 +60,20 @@ export default function AuditSummaryPage() {
   const { id } = useParams({ from: "/protected/audit-summary/$id" });
   const navigate = useNavigate();
   const [downloading, setDownloading] = useState(false);
+  const [submission, setSubmission] = useState<
+    AuditSubmission | null | undefined
+  >(undefined);
 
-  const submission = getAuditSubmissionById(id);
+  useEffect(() => {
+    getAuditSubmissionById(id).then((sub) => {
+      setSubmission(sub ?? null);
+    });
+  }, [id]);
 
   const handleDownload = async () => {
     if (!submission) return;
     setDownloading(true);
     try {
-      // Load images from IndexedDB before generating PDF
       const submissionWithImages = await loadImagesForSubmission(submission);
       await generateAuditPDF(submissionWithImages);
     } finally {
@@ -74,7 +81,19 @@ export default function AuditSummaryPage() {
     }
   };
 
-  if (!submission) {
+  // Loading state
+  if (submission === undefined) {
+    return (
+      <div
+        data-ocid="audit_summary.loading_state"
+        className="flex justify-center py-20"
+      >
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (submission === null) {
     return (
       <div
         className="max-w-lg mx-auto mt-16 text-center space-y-4"
@@ -281,7 +300,7 @@ export default function AuditSummaryPage() {
                 Manager Signature
                 {submission.managerName && (
                   <span className="ml-2 text-foreground normal-case">
-                    — {submission.managerName}
+                    &mdash; {submission.managerName}
                   </span>
                 )}
               </p>

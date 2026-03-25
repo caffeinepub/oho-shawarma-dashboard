@@ -6,6 +6,7 @@ import AuditReportsPage from "@/pages/AuditReportsPage";
 import AuditSummaryPage from "@/pages/AuditSummaryPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
+import MaintenanceTrackerPage from "@/pages/MaintenanceTrackerPage";
 import MyAuditReportsPage from "@/pages/MyAuditReportsPage";
 import OutletsPage from "@/pages/OutletsPage";
 import StartAuditPage from "@/pages/StartAuditPage";
@@ -108,6 +109,18 @@ const analyticsRoute = createRoute({
   component: AnalyticsPage,
 });
 
+const maintenanceTrackerRoute = createRoute({
+  getParentRoute: () => protectedLayoutRoute,
+  path: "/maintenance-tracker",
+  beforeLoad: () => {
+    const session = getSession();
+    if (session?.role === "auditor") {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
+  component: MaintenanceTrackerPage,
+});
+
 const startAuditRoute = createRoute({
   getParentRoute: () => protectedLayoutRoute,
   path: "/start-audit",
@@ -144,6 +157,7 @@ const routeTree = rootRoute.addChildren([
     outletsRoute,
     auditReportsRoute,
     analyticsRoute,
+    maintenanceTrackerRoute,
     startAuditRoute,
     myAuditsRoute,
     auditSummaryRoute,

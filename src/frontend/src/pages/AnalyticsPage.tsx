@@ -16,7 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getAuditReports, getAuditSubmissions } from "@/lib/store";
+import {
+  type AuditReport,
+  type AuditSubmission,
+  getAuditReports,
+  getAuditSubmissions,
+} from "@/lib/store";
 import {
   Activity,
   BarChart2,
@@ -226,26 +231,23 @@ const trendChartConfig: ChartConfig = {
 };
 
 export default function AnalyticsPage() {
-  const [allReports, setAllReports] = useState(() => getAuditReports());
-  const [allSubmissions, setAllSubmissions] = useState(() =>
-    getAuditSubmissions(),
-  );
+  const [allReports, setAllReports] = useState<AuditReport[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<AuditSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterOutlet, setFilterOutlet] = useState("all");
   const [filterAuditor, setFilterAuditor] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
 
-  // Auto-update when new audits are submitted
   useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === "oho_audit_submissions" || e.key === "oho_audits") {
-        setAllReports(getAuditReports());
-        setAllSubmissions(getAuditSubmissions());
-      }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    Promise.all([getAuditReports(), getAuditSubmissions()]).then(
+      ([reports, submissions]) => {
+        setAllReports(reports);
+        setAllSubmissions(submissions);
+        setLoading(false);
+      },
+    );
   }, []);
 
   const outletOptions = useMemo(
@@ -500,6 +502,17 @@ export default function AnalyticsPage() {
       prev?.type === type && prev?.key === key ? null : { type, key, label },
     );
   };
+
+  if (loading) {
+    return (
+      <div
+        data-ocid="analytics.loading_state"
+        className="flex justify-center items-center py-20"
+      >
+        <span className="animate-spin rounded-full border-4 border-muted border-t-primary w-10 h-10" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

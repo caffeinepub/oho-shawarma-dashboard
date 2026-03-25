@@ -25,7 +25,8 @@ import {
 import { generateAuditPDF } from "@/lib/pdf";
 import {
   type AuditReport,
-  clearSampleData,
+  type AuditSubmission,
+  clearTestOutletData,
   getAuditReports,
   getAuditSubmissionById,
   getAuditSubmissions,
@@ -44,7 +45,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
@@ -68,20 +69,37 @@ function scoreLabel(score: number): string {
 
 export default function AuditReportsPage() {
   const navigate = useNavigate();
-  const [reports, setReports] = useState<AuditReport[]>(() =>
-    getAuditReports(),
-  );
+  const [reports, setReports] = useState<AuditReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [allSubmissions, setAllSubmissions] = useState<AuditSubmission[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showExpiryModal, setShowExpiryModal] = useState(false);
 
-  const refresh = () => setReports(getAuditReports());
+  useEffect(() => {
+    Promise.all([getAuditReports(), getAuditSubmissions()]).then(
+      ([reportData, submissionData]) => {
+        setReports(reportData);
+        setAllSubmissions(submissionData);
+        setLoading(false);
+      },
+    );
+  }, []);
+
+  const refresh = () => {
+    getAuditReports().then(setReports);
+    getAuditSubmissions().then(setAllSubmissions);
+  };
 
   const hasSampleData = reports.some((r) => r.isSample);
 
-  const handleClearSample = () => {
-    clearSampleData();
-    refresh();
-    toast.success("Sample and test data cleared.");
+  const handleClearTestData = async () => {
+    try {
+      await clearTestOutletData();
+      refresh();
+      toast.success("Test outlet data cleared.");
+    } catch {
+      toast.error("Failed to clear test data.");
+    }
   };
 
   const handleDownload = async (report: AuditReport) => {
@@ -89,13 +107,13 @@ export default function AuditReportsPage() {
       toast.error("No submission data available for this report.");
       return;
     }
-    const sub = getAuditSubmissionById(report.submissionId);
-    if (!sub) {
-      toast.error("Submission data not found.");
-      return;
-    }
     setDownloadingId(report.id);
     try {
+      const sub = await getAuditSubmissionById(report.submissionId);
+      if (!sub) {
+        toast.error("Submission data not found.");
+        return;
+      }
       const subWithImages = await loadImagesForSubmission(sub);
       await generateAuditPDF(subWithImages);
     } catch {
@@ -107,7 +125,7 @@ export default function AuditReportsPage() {
 
   // Expiry dates data
   const expiryEntries = useMemo(() => {
-    return getAuditSubmissions()
+    return allSubmissions
       .filter(
         (s) =>
           s.fireExtinguisherExpiryDate &&
@@ -120,7 +138,7 @@ export default function AuditReportsPage() {
         submittedAt: s.submittedAt,
       }))
       .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
-  }, []);
+  }, [allSubmissions]);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -160,6 +178,10 @@ export default function AuditReportsPage() {
     setPage(1);
   };
 
+  const getAuditId = (report: AuditReport): string => {
+    return report.auditId || report.id.slice(0, 8).toUpperCase();
+  };
+
   const filtered = useMemo(() => {
     let out = [...reports];
     if (search) {
@@ -167,12 +189,9 @@ export default function AuditReportsPage() {
       out = out.filter(
         (r) =>
           r.outletName.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q) ||
-          (r.submissionId &&
-            (() => {
-              const sub = getAuditSubmissionById(r.submissionId!);
-              return sub?.auditId?.toLowerCase().includes(q);
-            })()),
+          r.auditorName.toLowerCase().includes(q) ||
+          r.auditId?.toLowerCase().includes(q) ||
+          r.id.toLowerCase().includes(q),
       );
     }
     if (filterOutlet !== "all")
@@ -228,14 +247,6 @@ export default function AuditReportsPage() {
     );
   };
 
-  const getAuditId = (report: AuditReport): string => {
-    if (report.submissionId) {
-      const sub = getAuditSubmissionById(report.submissionId);
-      if (sub?.auditId) return sub.auditId;
-    }
-    return report.id.slice(0, 8).toUpperCase();
-  };
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -246,7 +257,7 @@ export default function AuditReportsPage() {
             {reports.length} report{reports.length !== 1 ? "s" : ""} on record
             {hasFilters && filtered.length !== reports.length && (
               <span className="ml-1 text-primary">
-                · {filtered.length} matching
+                &middot; {filtered.length} matching
               </span>
             )}
           </p>
@@ -268,7 +279,7 @@ export default function AuditReportsPage() {
               variant="outline"
               size="sm"
               data-ocid="audit.delete_button"
-              onClick={handleClearSample}
+              onClick={handleClearTestData}
               className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
             >
               <Trash2 className="w-4 h-4" />
@@ -283,7 +294,7 @@ export default function AuditReportsPage() {
         <div className="col-span-2 md:col-span-1 relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search by outlet or audit ID…"
+            placeholder="Search by outlet or audit ID\u2026"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -370,8 +381,15 @@ export default function AuditReportsPage() {
         </Button>
       </div>
 
-      {/* Table */}
-      {paged.length === 0 ? (
+      {/* Loading state */}
+      {loading ? (
+        <div
+          data-ocid="audit.loading_state"
+          className="flex justify-center items-center py-16"
+        >
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : paged.length === 0 ? (
         <div
           data-ocid="audit.empty_state"
           className="flex flex-col items-center justify-center py-16 text-center border rounded-lg"
@@ -526,7 +544,7 @@ export default function AuditReportsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
               <p className="text-xs text-muted-foreground">
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}&#8211;
                 {Math.min(currentPage * PAGE_SIZE, filtered.length)} of{" "}
                 {filtered.length}
               </p>

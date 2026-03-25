@@ -10,9 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  type MaintenanceRow,
+  type AuditSubmission,
   getAuditReports,
-  getMaintenanceTrackerData,
   getMyAuditSubmissions,
   getOutlets,
   getSession,
@@ -28,7 +27,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function scoreColor(score: number): string {
   if (score >= 80) return "text-green-600 dark:text-green-400";
@@ -37,11 +36,17 @@ function scoreColor(score: number): string {
 }
 
 function AuditorDashboard() {
-  const session = getSession();
   const navigate = useNavigate();
-  const [myAudits] = useState(() =>
-    session ? getMyAuditSubmissions(session.userId) : [],
-  );
+  const [myAudits, setMyAudits] = useState<AuditSubmission[]>([]);
+
+  useEffect(() => {
+    const session = getSession();
+    if (session) {
+      getMyAuditSubmissions(session.userId).then(setMyAudits);
+    }
+  }, []);
+
+  const session = getSession();
 
   const recent = [...myAudits]
     .sort(
@@ -191,10 +196,11 @@ function AdminDashboard() {
   const session = getSession();
   const [users] = useState(() => getUsers());
   const [outlets] = useState(() => getOutlets());
-  const [audits] = useState(() => getAuditReports());
-  const [maintenanceData] = useState<MaintenanceRow[]>(() =>
-    getMaintenanceTrackerData(),
-  );
+  const [auditCount, setAuditCount] = useState(0);
+
+  useEffect(() => {
+    getAuditReports().then((reports) => setAuditCount(reports.length));
+  }, []);
 
   const auditorCount = users.filter((u) => u.role === "auditor").length;
 
@@ -213,7 +219,7 @@ function AdminDashboard() {
     },
     {
       label: "Total Audits",
-      value: audits.length,
+      value: auditCount,
       icon: ClipboardList,
       description: "Audit reports on record",
     },
@@ -232,7 +238,7 @@ function AdminDashboard() {
           Welcome back, {session?.name} 👋
         </h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Here's an overview of your Oho Shawarma operations.
+          Here&apos;s an overview of your Oho Shawarma operations.
         </p>
       </div>
 
@@ -285,90 +291,6 @@ function AdminDashboard() {
             <span className="text-sm font-medium">
               Oho Shawarma Internal v2.0
             </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Maintenance & Expiry Tracker - Admin Only */}
-      <Card className="border">
-        <CardHeader className="pb-3">
-          <CardTitle className="font-display font-bold text-base flex items-center gap-2">
-            <span className="w-2 h-5 rounded-sm bg-primary inline-block" />
-            Maintenance &amp; Expiry Tracker
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Shows the most recent recorded date per outlet from submitted
-            audits.
-          </p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto max-h-96">
-            <table className="min-w-full text-xs border-collapse">
-              <thead>
-                <tr>
-                  {[
-                    "Outlet Name",
-                    "Fire Extinguisher Expiry",
-                    "Duct & Hood Last Service",
-                    "Water Filter Last Service",
-                    "Visicooler Last Service",
-                    "Deep Freezer Last Service",
-                    "Next Pest Control Date",
-                  ].map((col) => (
-                    <th
-                      key={col}
-                      className="px-3 py-2 text-left font-semibold whitespace-nowrap border-b dark:bg-slate-800 dark:text-slate-100"
-                      style={{ backgroundColor: "#fdbc0c", color: "#361e14" }}
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {maintenanceData.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-3 py-6 text-center text-muted-foreground"
-                    >
-                      No audit data yet. Submit audits to populate this tracker.
-                    </td>
-                  </tr>
-                ) : (
-                  maintenanceData.map((row, idx) => (
-                    <tr
-                      key={row.outletName}
-                      className={
-                        idx % 2 === 0 ? "bg-background" : "bg-muted/30"
-                      }
-                    >
-                      <td className="px-3 py-2 font-medium whitespace-nowrap border-b">
-                        {row.outletName}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b">
-                        {row.fireExtinguisherExpiryDate ?? "--"}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b">
-                        {row.ductHoodLastServiceDate ?? "--"}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b">
-                        {row.waterFilterLastServiceDate ?? "--"}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b">
-                        {row.visicoolerLastServiceDate ?? "--"}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b">
-                        {row.deepFreezerLastServiceDate ?? "--"}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-b">
-                        {row.pestControlDate ?? "--"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
           </div>
         </CardContent>
       </Card>
