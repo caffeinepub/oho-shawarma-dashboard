@@ -24,6 +24,16 @@ export const UserProfile = IDL.Record({
   'role' : IDL.Text,
   'email' : IDL.Text,
 });
+export const StoredAuditSubmission = IDL.Record({
+  'id' : IDL.Text,
+  'auditId' : IDL.Text,
+  'outletName' : IDL.Text,
+  'auditorId' : IDL.Text,
+  'auditorName' : IDL.Text,
+  'submittedAt' : IDL.Text,
+  'score' : IDL.Nat,
+  'payload' : IDL.Text,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -55,6 +65,11 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'submitAuditSubmission' : IDL.Func([StoredAuditSubmission], [], []),
+  'getAllAuditSubmissions' : IDL.Func([], [IDL.Vec(StoredAuditSubmission)], ['query']),
+  'getAuditSubmissionById' : IDL.Func([IDL.Text], [IDL.Opt(StoredAuditSubmission)], ['query']),
+  'deleteAuditSubmission' : IDL.Func([IDL.Text], [], []),
+  'deleteAuditSubmissionsByOutlet' : IDL.Func([IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -75,6 +90,16 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'role' : IDL.Text,
     'email' : IDL.Text,
+  });
+  const StoredAuditSubmission = IDL.Record({
+    'id' : IDL.Text,
+    'auditId' : IDL.Text,
+    'outletName' : IDL.Text,
+    'auditorId' : IDL.Text,
+    'auditorName' : IDL.Text,
+    'submittedAt' : IDL.Text,
+    'score' : IDL.Nat,
+    'payload' : IDL.Text,
   });
   
   return IDL.Service({
@@ -107,6 +132,11 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'submitAuditSubmission' : IDL.Func([StoredAuditSubmission], [], []),
+    'getAllAuditSubmissions' : IDL.Func([], [IDL.Vec(StoredAuditSubmission)], ['query']),
+    'getAuditSubmissionById' : IDL.Func([IDL.Text], [IDL.Opt(StoredAuditSubmission)], ['query']),
+    'deleteAuditSubmission' : IDL.Func([IDL.Text], [], []),
+    'deleteAuditSubmissionsByOutlet' : IDL.Func([IDL.Text], [], []),
   });
 };
 

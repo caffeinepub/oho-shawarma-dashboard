@@ -105,6 +105,16 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export interface StoredAuditSubmission {
+    id: string;
+    auditId: string;
+    outletName: string;
+    auditorId: string;
+    auditorName: string;
+    submittedAt: string;
+    score: bigint;
+    payload: string;
+}
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
@@ -123,8 +133,13 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateOutlet(outletId: bigint, name: string, location: string): Promise<void>;
     updateUser(userPrincipal: Principal, name: string, email: string, role: string): Promise<void>;
+    submitAuditSubmission(sub: StoredAuditSubmission): Promise<void>;
+    getAllAuditSubmissions(): Promise<Array<StoredAuditSubmission>>;
+    getAuditSubmissionById(id: string): Promise<StoredAuditSubmission | null>;
+    deleteAuditSubmission(id: string): Promise<void>;
+    deleteAuditSubmissionsByOutlet(outletName: string): Promise<void>;
 }
-import type { UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { UserProfile as _UserProfile, UserRole as _UserRole, StoredAuditSubmission as _StoredAuditSubmission } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
@@ -362,6 +377,76 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateUser(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async submitAuditSubmission(arg0: StoredAuditSubmission): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.submitAuditSubmission(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.submitAuditSubmission(arg0);
+            return result;
+        }
+    }
+    async getAllAuditSubmissions(): Promise<Array<StoredAuditSubmission>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllAuditSubmissions();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllAuditSubmissions();
+            return result;
+        }
+    }
+    async getAuditSubmissionById(arg0: string): Promise<StoredAuditSubmission | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAuditSubmissionById(arg0);
+                return result.length === 0 ? null : result[0];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAuditSubmissionById(arg0);
+            return result.length === 0 ? null : result[0];
+        }
+    }
+    async deleteAuditSubmission(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteAuditSubmission(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteAuditSubmission(arg0);
+            return result;
+        }
+    }
+    async deleteAuditSubmissionsByOutlet(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteAuditSubmissionsByOutlet(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteAuditSubmissionsByOutlet(arg0);
             return result;
         }
     }

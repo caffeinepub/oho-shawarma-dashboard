@@ -24,6 +24,16 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface StoredAuditSubmission {
+  'id' : string,
+  'auditId' : string,
+  'outletName' : string,
+  'auditorId' : string,
+  'auditorName' : string,
+  'submittedAt' : string,
+  'score' : bigint,
+  'payload' : string,
+}
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
@@ -42,6 +52,11 @@ export interface _SERVICE {
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'updateOutlet' : ActorMethod<[bigint, string, string], undefined>,
   'updateUser' : ActorMethod<[Principal, string, string, string], undefined>,
+  'submitAuditSubmission' : ActorMethod<[StoredAuditSubmission], undefined>,
+  'getAllAuditSubmissions' : ActorMethod<[], Array<StoredAuditSubmission>>,
+  'getAuditSubmissionById' : ActorMethod<[string], [] | [StoredAuditSubmission]>,
+  'deleteAuditSubmission' : ActorMethod<[string], undefined>,
+  'deleteAuditSubmissionsByOutlet' : ActorMethod<[string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
