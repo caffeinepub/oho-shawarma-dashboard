@@ -152,8 +152,8 @@ const DEFAULT_ADMIN: User = {
 const DEFAULT_AUDITOR: User = {
   id: "default-auditor-pravin",
   name: "Pravin Dubey",
-  email: "ohoshawarma.auditor@ohoshawarma.com",
-  password: "Audit@oho2026",
+  email: "ohoshawarma.auditor@gmail.com",
+  password: "Oho@audit",
   role: "auditor",
   status: "active",
   createdAt: new Date().toISOString(),
@@ -392,8 +392,21 @@ function initUsers(): User[] {
     return users;
   }
   let users = JSON.parse(raw) as User[];
-  // Ensure default auditor always exists
-  if (!users.find((u) => u.id === "default-auditor-pravin")) {
+  // Ensure default auditor always exists with up-to-date credentials
+  const idx = users.findIndex((u) => u.id === "default-auditor-pravin");
+  if (idx !== -1) {
+    if (
+      users[idx].email !== DEFAULT_AUDITOR.email ||
+      users[idx].password !== DEFAULT_AUDITOR.password
+    ) {
+      users[idx] = {
+        ...users[idx],
+        email: DEFAULT_AUDITOR.email,
+        password: DEFAULT_AUDITOR.password,
+      };
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+  } else {
     users = [...users, DEFAULT_AUDITOR];
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }
