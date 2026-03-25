@@ -67,6 +67,19 @@ function scoreLabel(score: number): string {
   return "Critical";
 }
 
+function parseAuditDate(dateStr: string): Date {
+  if (!dateStr) return new Date(Number.NaN);
+  if (dateStr.includes("-") && dateStr.length >= 10) return new Date(dateStr);
+  const parts = dateStr.split("/");
+  if (parts.length === 3)
+    return new Date(
+      Number.parseInt(parts[2]),
+      Number.parseInt(parts[1]) - 1,
+      Number.parseInt(parts[0]),
+    );
+  return new Date(dateStr);
+}
+
 export default function AuditReportsPage() {
   const navigate = useNavigate();
   const [reports, setReports] = useState<AuditReport[]>([]);
@@ -480,7 +493,7 @@ export default function AuditReportsPage() {
                       {report.auditorName}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {new Date(report.date).toLocaleDateString("en-IN", {
+                      {parseAuditDate(report.date).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",

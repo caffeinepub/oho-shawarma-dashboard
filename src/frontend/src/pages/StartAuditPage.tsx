@@ -184,6 +184,7 @@ export default function StartAuditPage() {
 
   // Validation highlighting
   const [missingKeys, setMissingKeys] = useState<Set<string>>(new Set());
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>([]);
 
   // Audit Summary state
@@ -358,6 +359,7 @@ export default function StartAuditPage() {
 
   const handleSubmit = async () => {
     if (!session || !selectedOutlet) return;
+    setAttemptedSubmit(true);
 
     // Collect missing parameter keys with descriptive names
     const newMissing = new Set<string>();
@@ -371,16 +373,50 @@ export default function StartAuditPage() {
           newMissing.add(key);
           missingLabels.push(`• ${section.title} > ${item.label}`);
           sectionsWithMissing.add(section.id);
+        } else if (
+          section.isStarRating &&
+          typeof item.value === "number" &&
+          item.value <= 3 &&
+          !item.followUpAction?.trim()
+        ) {
+          const key = `${section.id}:${item.id}:followup`;
+          newMissing.add(key);
+          missingLabels.push(
+            `• ${section.title} > ${item.label} (Follow-Up Action required)`,
+          );
+          sectionsWithMissing.add(section.id);
+        } else if (
+          !section.isStarRating &&
+          item.value === "NO" &&
+          !item.followUpAction?.trim()
+        ) {
+          const key = `${section.id}:${item.id}:followup`;
+          newMissing.add(key);
+          missingLabels.push(
+            `• ${section.title} > ${item.label} (Follow-Up Action required)`,
+          );
+          sectionsWithMissing.add(section.id);
         }
       }
     }
 
     const summaryMissing: string[] = [];
+    if (!auditDate) summaryMissing.push("• Audit Date");
     if (!overallRemarks.trim()) summaryMissing.push("• Overall Remarks");
     if (!auditorSignature) summaryMissing.push("• Auditor Signature");
     if (!managerSignature) summaryMissing.push("• Manager Signature");
     if (!fireExtExpiryDate)
       summaryMissing.push("• Fire Extinguisher Expiry Date");
+    if (!ductHoodServiceDate)
+      summaryMissing.push("• Duct & Hood Last Service Date");
+    if (!waterFilterServiceDate)
+      summaryMissing.push("• Water Filter Last Service Date");
+    if (!visicoolerServiceDate)
+      summaryMissing.push("• Visicooler Last Service Date");
+    if (!deepFreezerServiceDate)
+      summaryMissing.push("• Deep Freezer Last Service Date");
+    if (!pestControlDate)
+      summaryMissing.push("• Next Pest Control Service Date");
 
     if (newMissing.size > 0 || summaryMissing.length > 0) {
       setMissingKeys(newMissing);
@@ -748,14 +784,28 @@ export default function StartAuditPage() {
                             <Textarea
                               placeholder="Describe the corrective action required..."
                               value={item.followUpAction ?? ""}
-                              onChange={(e) =>
+                              onChange={(e) => {
                                 updateItemFollowUpAction(
                                   section.id,
                                   item.id,
                                   e.target.value,
+                                );
+                                setMissingKeys((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(
+                                    `${section.id}:${item.id}:followup`,
+                                  );
+                                  return next;
+                                });
+                              }}
+                              className={cn(
+                                "text-xs min-h-[60px] resize-none focus-visible:ring-red-400",
+                                missingKeys.has(
+                                  `${section.id}:${item.id}:followup`,
                                 )
-                              }
-                              className="text-xs min-h-[60px] resize-none border-red-200 dark:border-red-900/50 focus-visible:ring-red-400"
+                                  ? "border-red-500 bg-red-50 dark:bg-red-950/20"
+                                  : "border-red-200 dark:border-red-900/50",
+                              )}
                               data-ocid="start_audit.item.textarea"
                             />
                           </div>
@@ -770,14 +820,28 @@ export default function StartAuditPage() {
                             <Textarea
                               placeholder="Describe the corrective action required..."
                               value={item.followUpAction ?? ""}
-                              onChange={(e) =>
+                              onChange={(e) => {
                                 updateItemFollowUpAction(
                                   section.id,
                                   item.id,
                                   e.target.value,
+                                );
+                                setMissingKeys((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(
+                                    `${section.id}:${item.id}:followup`,
+                                  );
+                                  return next;
+                                });
+                              }}
+                              className={cn(
+                                "text-xs min-h-[60px] resize-none focus-visible:ring-red-400",
+                                missingKeys.has(
+                                  `${section.id}:${item.id}:followup`,
                                 )
-                              }
-                              className="text-xs min-h-[60px] resize-none border-red-200 dark:border-red-900/50 focus-visible:ring-red-400"
+                                  ? "border-red-500 bg-red-50 dark:bg-red-950/20"
+                                  : "border-red-200 dark:border-red-900/50",
+                              )}
                               data-ocid="start_audit.item.textarea"
                             />
                           </div>
@@ -786,7 +850,8 @@ export default function StartAuditPage() {
                         {item.label === "Duct and Hood grease free" && (
                           <div className="mt-2 space-y-1">
                             <Label className="text-sm font-semibold">
-                              Last Service Date
+                              Last Service Date{" "}
+                              <span className="text-destructive">*</span>
                             </Label>
                             <Input
                               type="date"
@@ -794,14 +859,20 @@ export default function StartAuditPage() {
                               onChange={(e) =>
                                 setDuctHoodServiceDate(e.target.value)
                               }
-                              className="mt-1 max-w-xs"
+                              className={cn(
+                                "mt-1 max-w-xs",
+                                attemptedSubmit &&
+                                  !ductHoodServiceDate &&
+                                  "border-red-500 bg-red-50 dark:bg-red-950/20",
+                              )}
                             />
                           </div>
                         )}
                         {item.label === "Water Filter working" && (
                           <div className="mt-2 space-y-1">
                             <Label className="text-sm font-semibold">
-                              Last Service Date
+                              Last Service Date{" "}
+                              <span className="text-destructive">*</span>
                             </Label>
                             <Input
                               type="date"
@@ -809,14 +880,20 @@ export default function StartAuditPage() {
                               onChange={(e) =>
                                 setWaterFilterServiceDate(e.target.value)
                               }
-                              className="mt-1 max-w-xs"
+                              className={cn(
+                                "mt-1 max-w-xs",
+                                attemptedSubmit &&
+                                  !waterFilterServiceDate &&
+                                  "border-red-500 bg-red-50 dark:bg-red-950/20",
+                              )}
                             />
                           </div>
                         )}
                         {item.label === "Visicooler cooling and clean" && (
                           <div className="mt-2 space-y-1">
                             <Label className="text-sm font-semibold">
-                              Last Service Date
+                              Last Service Date{" "}
+                              <span className="text-destructive">*</span>
                             </Label>
                             <Input
                               type="date"
@@ -824,14 +901,20 @@ export default function StartAuditPage() {
                               onChange={(e) =>
                                 setVisicoolerServiceDate(e.target.value)
                               }
-                              className="mt-1 max-w-xs"
+                              className={cn(
+                                "mt-1 max-w-xs",
+                                attemptedSubmit &&
+                                  !visicoolerServiceDate &&
+                                  "border-red-500 bg-red-50 dark:bg-red-950/20",
+                              )}
                             />
                           </div>
                         )}
                         {item.label === "Deep Freezer hygienic" && (
                           <div className="mt-2 space-y-1">
                             <Label className="text-sm font-semibold">
-                              Last Service Date
+                              Last Service Date{" "}
+                              <span className="text-destructive">*</span>
                             </Label>
                             <Input
                               type="date"
@@ -839,7 +922,12 @@ export default function StartAuditPage() {
                               onChange={(e) =>
                                 setDeepFreezerServiceDate(e.target.value)
                               }
-                              className="mt-1 max-w-xs"
+                              className={cn(
+                                "mt-1 max-w-xs",
+                                attemptedSubmit &&
+                                  !deepFreezerServiceDate &&
+                                  "border-red-500 bg-red-50 dark:bg-red-950/20",
+                              )}
                             />
                           </div>
                         )}
@@ -882,13 +970,19 @@ export default function StartAuditPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm font-semibold">
-              Next Pest Control Service Date
+              Next Pest Control Service Date{" "}
+              <span className="text-destructive">*</span>
             </Label>
             <Input
               type="date"
               value={pestControlDate}
               onChange={(e) => setPestControlDate(e.target.value)}
-              className="max-w-xs"
+              className={cn(
+                "max-w-xs",
+                attemptedSubmit &&
+                  !pestControlDate &&
+                  "border-red-500 bg-red-50 dark:bg-red-950/20",
+              )}
               data-ocid="pest_section.date.input"
             />
           </div>
@@ -990,15 +1084,20 @@ export default function StartAuditPage() {
                   className={cn(
                     "w-full flex items-center justify-start gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                     !auditDate && "text-muted-foreground",
+                    attemptedSubmit &&
+                      !auditDate &&
+                      "border-red-500 bg-red-50 dark:bg-red-950/20",
                   )}
                 >
                   <CalendarIcon className="h-4 w-4 shrink-0" />
                   {auditDate ? auditDate : "Pick a date"}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-2" align="start">
                 <Calendar
                   mode="single"
+                  className="rounded-md border"
+                  style={{ ["--cell-size" as string]: "2.25rem" }}
                   selected={selectedDate}
                   onSelect={(date) => {
                     setSelectedDate(date);

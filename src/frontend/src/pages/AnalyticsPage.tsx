@@ -908,26 +908,33 @@ export default function AnalyticsPage() {
                       tick={{ fontSize: 11 }}
                       tickFormatter={(v) => {
                         if (!v || typeof v !== "string") return "";
-                        const parts = v.split("-");
-                        if (parts.length === 3) {
-                          const months = [
-                            "Jan",
-                            "Feb",
-                            "Mar",
-                            "Apr",
-                            "May",
-                            "Jun",
-                            "Jul",
-                            "Aug",
-                            "Sep",
-                            "Oct",
-                            "Nov",
-                            "Dec",
-                          ];
-                          const month = Number.parseInt(parts[1], 10) - 1;
-                          if (month >= 0 && month < 12) {
-                            return `${Number.parseInt(parts[2], 10)} ${months[month]}`;
-                          }
+                        const months = [
+                          "Jan",
+                          "Feb",
+                          "Mar",
+                          "Apr",
+                          "May",
+                          "Jun",
+                          "Jul",
+                          "Aug",
+                          "Sep",
+                          "Oct",
+                          "Nov",
+                          "Dec",
+                        ];
+                        // Handle DD/MM/YYYY
+                        const slashParts = v.split("/");
+                        if (slashParts.length === 3) {
+                          const month = Number.parseInt(slashParts[1], 10) - 1;
+                          if (month >= 0 && month < 12)
+                            return `${Number.parseInt(slashParts[0], 10)} ${months[month]}`;
+                        }
+                        // Handle YYYY-MM-DD
+                        const dashParts = v.split("-");
+                        if (dashParts.length === 3) {
+                          const month = Number.parseInt(dashParts[1], 10) - 1;
+                          if (month >= 0 && month < 12)
+                            return `${Number.parseInt(dashParts[2], 10)} ${months[month]}`;
                         }
                         return v;
                       }}
