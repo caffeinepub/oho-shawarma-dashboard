@@ -196,7 +196,9 @@ export default function StartAuditPage() {
     undefined,
   );
   const [managerName, setManagerName] = useState("");
-  const [auditDate, setAuditDate] = useState("");
+  const today = new Date();
+  const todayFormatted = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+  const [auditDate, setAuditDate] = useState(todayFormatted);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [fireExtExpiryDate, setFireExtExpiryDate] = useState("");
   const [ductHoodServiceDate, setDuctHoodServiceDate] = useState("");
@@ -204,7 +206,7 @@ export default function StartAuditPage() {
   const [visicoolerServiceDate, setVisicoolerServiceDate] = useState("");
   const [deepFreezerServiceDate, setDeepFreezerServiceDate] = useState("");
   const [pestControlDate, setPestControlDate] = useState("");
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(today);
 
   const selectedOutlet = outlets.find((o) => o.id === selectedOutletId);
 
@@ -1083,7 +1085,6 @@ export default function StartAuditPage() {
                   data-ocid="audit_summary.date.input"
                   className={cn(
                     "w-full flex items-center justify-start gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                    !auditDate && "text-muted-foreground",
                     attemptedSubmit &&
                       !auditDate &&
                       "border-red-500 bg-red-50 dark:bg-red-950/20",
