@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   BarChart2,
   ClipboardList,
+  Download,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -15,7 +16,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Light mode (brand)
 const LIGHT = {
@@ -112,6 +113,11 @@ const pageTitles: Record<string, string> = {
   "/maintenance-tracker": "Maintenance Tracker",
 };
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -126,6 +132,43 @@ export default function Layout() {
     document.documentElement.classList.toggle("dark", isDark);
     return isDark;
   });
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed (standalone mode)
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    window.addEventListener("appinstalled", () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result.outcome === "accepted") {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    }
+  };
 
   const C = dark ? DARK : LIGHT;
 
@@ -310,15 +353,39 @@ export default function Layout() {
               {currentTitle}
             </h1>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            data-ocid="header.dark_mode_toggle"
-            onClick={toggleDark}
-            className="rounded-full"
-          >
-            {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            {/* Install / Add to Home Screen button */}
+            {!isInstalled && installPrompt && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-ocid="header.install_button"
+                onClick={handleInstall}
+                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full"
+                style={{
+                  backgroundColor: dark ? "#334155" : "#fdbc0c",
+                  color: dark ? "#e2e8f0" : "#361e14",
+                }}
+                title="Add to Home Screen"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Install App</span>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              data-ocid="header.dark_mode_toggle"
+              onClick={toggleDark}
+              className="rounded-full"
+            >
+              {dark ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
