@@ -160,13 +160,27 @@ export default function Layout() {
     };
   }, []);
 
+  const [installMsg, setInstallMsg] = useState<string | null>(null);
+
   const handleInstall = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const result = await installPrompt.userChoice;
-    if (result.outcome === "accepted") {
-      setIsInstalled(true);
-      setInstallPrompt(null);
+    if (isInstalled) {
+      setInstallMsg("Already added to home screen");
+      setTimeout(() => setInstallMsg(null), 3000);
+      return;
+    }
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const result = await installPrompt.userChoice;
+      if (result.outcome === "accepted") {
+        setIsInstalled(true);
+        setInstallPrompt(null);
+        setInstallMsg("Added to home screen!");
+        setTimeout(() => setInstallMsg(null), 3000);
+      }
+    } else {
+      // Fallback for browsers that don't support beforeinstallprompt (e.g. Safari iOS)
+      setInstallMsg("Tap browser menu → Add to Home Screen");
+      setTimeout(() => setInstallMsg(null), 5000);
     }
   };
 
@@ -354,8 +368,8 @@ export default function Layout() {
             </h1>
           </div>
           <div className="flex items-center gap-1">
-            {/* Install / Add to Home Screen button */}
-            {!isInstalled && installPrompt && (
+            {/* Install / Add to Home Screen button - always visible */}
+            <div className="relative">
               <Button
                 variant="ghost"
                 size="sm"
@@ -365,13 +379,34 @@ export default function Layout() {
                 style={{
                   backgroundColor: dark ? "#334155" : "#fdbc0c",
                   color: dark ? "#e2e8f0" : "#361e14",
+                  opacity: isInstalled ? 0.7 : 1,
                 }}
-                title="Add to Home Screen"
+                title={
+                  isInstalled
+                    ? "Already added to home screen"
+                    : "Add to Home Screen"
+                }
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Install App</span>
+                <span className="hidden sm:inline">
+                  {isInstalled ? "Installed" : "Install App"}
+                </span>
               </Button>
-            )}
+              {installMsg && (
+                <div
+                  className="absolute right-0 top-10 z-50 text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
+                  style={{
+                    backgroundColor: dark ? "#1e293b" : "#ffffff",
+                    color: dark ? "#e2e8f0" : "#361e14",
+                    border: dark ? "1px solid #334155" : "1px solid #fdbc0c",
+                    maxWidth: "220px",
+                    whiteSpace: "normal",
+                  }}
+                >
+                  {installMsg}
+                </div>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="icon"

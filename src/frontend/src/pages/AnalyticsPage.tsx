@@ -230,6 +230,17 @@ const trendChartConfig: ChartConfig = {
   score: { label: "Avg Compliance %", color: "#0ea5e9" },
 };
 
+// Normalize date to YYYY-MM-DD for consistent comparison.
+// Handles both DD/MM/YYYY (audit form format) and YYYY-MM-DD (ISO) inputs.
+function toISODate(dateStr: string | undefined): string {
+  if (!dateStr) return "";
+  // DD/MM/YYYY → YYYY-MM-DD
+  const ddmmyyyy = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  // Already YYYY-MM-DD or ISO timestamp → take first 10 chars
+  return dateStr.slice(0, 10);
+}
+
 export default function AnalyticsPage() {
   const [allReports, setAllReports] = useState<AuditReport[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<AuditSubmission[]>([]);
@@ -270,8 +281,9 @@ export default function AnalyticsPage() {
           return false;
         if (filterAuditor !== "all" && r.auditorName !== filterAuditor)
           return false;
-        if (filterDateFrom && r.date < filterDateFrom) return false;
-        if (filterDateTo && r.date > filterDateTo) return false;
+        const rDate = toISODate(r.date);
+        if (filterDateFrom && rDate < filterDateFrom) return false;
+        if (filterDateTo && rDate > filterDateTo) return false;
         return true;
       }),
     [allReports, filterOutlet, filterAuditor, filterDateFrom, filterDateTo],
@@ -285,8 +297,10 @@ export default function AnalyticsPage() {
           return false;
         if (filterAuditor !== "all" && s.auditorName !== filterAuditor)
           return false;
-        if (filterDateFrom && date && date < filterDateFrom) return false;
-        if (filterDateTo && date && date > filterDateTo) return false;
+        const normDate = toISODate(date);
+        if (filterDateFrom && normDate && normDate < filterDateFrom)
+          return false;
+        if (filterDateTo && normDate && normDate > filterDateTo) return false;
         return true;
       }),
     [allSubmissions, filterOutlet, filterAuditor, filterDateFrom, filterDateTo],
@@ -412,7 +426,8 @@ export default function AnalyticsPage() {
   const trendData = useMemo(() => {
     const dayMap: Record<string, { total: number; count: number }> = {};
     for (const s of filteredSubmissions) {
-      const day = s.auditDate || s.submittedAt?.slice(0, 10);
+      const rawDay = s.auditDate || s.submittedAt?.slice(0, 10);
+      const day = toISODate(rawDay);
       if (!day) continue;
       if (!dayMap[day]) dayMap[day] = { total: 0, count: 0 };
       dayMap[day].total += s.score;
@@ -420,11 +435,13 @@ export default function AnalyticsPage() {
     }
     if (Object.keys(dayMap).length === 0) {
       for (const r of filteredReports) {
-        if (!dayMap[r.date]) dayMap[r.date] = { total: 0, count: 0 };
-        dayMap[r.date].total += r.score;
-        dayMap[r.date].count++;
+        const day = toISODate(r.date);
+        if (!dayMap[day]) dayMap[day] = { total: 0, count: 0 };
+        dayMap[day].total += r.score;
+        dayMap[day].count++;
       }
     }
+    // Sort ascending: oldest date on the left, newest on the right
     return Object.entries(dayMap)
       .map(([date, d]) => ({ date, score: Math.round(d.total / d.count) }))
       .sort((a, b) => a.date.localeCompare(b.date));
