@@ -1,0 +1,23 @@
+{
+  "name": "Oho Shawarma Audit",
+  "short_name": "OhoAudit",
+  "description": "Internal audit management dashboard for Oho Shawarma",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#361e14",
+  "theme_color": "#361e14",
+  "icons": [
+    {
+      "src": "/assets/generated/pwa-icon-192.dim_192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/generated/pwa-icon-512.dim_512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

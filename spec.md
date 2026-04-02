@@ -1,42 +1,27 @@
 # Oho Shawarma Dashboard
 
 ## Current State
-All audit data (submissions and reports) is stored in browser `localStorage` via `store.ts`. This means audit records created on one device are invisible on any other device. The ICP backend canister exists but only stores user profiles and outlets — no audit data.
+Full-stack audit management app with React frontend and Motoko backend. PWA support not yet added. Audit form has no refresh/navigation guard.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `submitAuditSubmission`, `getAllAuditSubmissions`, `getAuditSubmissionById`, `deleteAuditSubmission`, `deleteAuditSubmissionsByOutlet` methods to the Motoko backend canister
-- `StoredAuditSubmission` type in Motoko: stores id, auditId, outletName, auditorId, auditorName, submittedAt, score (Nat), payload (JSON blob with full submission data)
-- `StoredAuditSubmission` TypeScript type in `backend.d.ts`
-- Async actor singleton helper in `store.ts` for canister calls
+- PWA manifest using the Oho Shawarma circular logo as the app icon (multiple sizes)
+- Service worker registration for PWA installability
+- Refresh/navigation guard on the audit form: if any field has been touched, intercept browser refresh/tab close with a custom modal showing "If you refresh, data will be lost" with Ok and Cancel buttons
 
 ### Modify
-- `store.ts`: all audit functions become async, delegating to the ICP canister instead of localStorage
-  - `createAuditSubmission()` → serializes and calls `actor.submitAuditSubmission()`
-  - `getAuditSubmissions()` → calls `actor.getAllAuditSubmissions()` and deserializes
-  - `getAuditReports()` → derives AuditReport objects from backend submissions
-  - `getMyAuditSubmissions(auditorId)` → fetches all, filters by auditorId client-side
-  - `getAuditSubmissionById(id)` → calls `actor.getAuditSubmissionById(id)`
-  - `getMaintenanceTrackerData()` → derives from backend submissions
-  - `clearTestOutletData()` → calls `actor.deleteAuditSubmissionsByOutlet()`
-  - Remove all localStorage keys for audits (AUDITS_KEY, SUBMISSIONS_KEY)
-- Pages updated to use async loading patterns (useEffect + useState instead of sync initializers):
-  - `AuditReportsPage.tsx`
-  - `MyAuditReportsPage.tsx`
-  - `AnalyticsPage.tsx`
-  - `MaintenanceTrackerPage.tsx`
-  - `AuditSummaryPage.tsx`
+- `index.html` to reference the PWA manifest and theme color
+- Audit form component to track dirty state and show warning dialog on refresh/unload attempt
 
 ### Remove
-- `localStorage.setItem/getItem` calls for `oho_audits` and `oho_audit_submissions` keys
-- `initAudits()`, `initSubmissions()`, `saveAudits()`, `saveSubmissions()` localStorage helpers
-- `StorageEvent` listener on `window` in AnalyticsPage (localStorage events no longer used)
+- Nothing
 
 ## Implementation Plan
-1. ✅ Update `main.mo` with audit storage methods (no auth check — app uses its own email/password auth)
-2. Update `backend.d.ts` to add `StoredAuditSubmission` type and new canister methods to `backendInterface`
-3. Rewrite audit functions in `store.ts` to be async and delegate to canister via `createActorWithConfig()`
-4. Update each affected page to load data asynchronously with useEffect, show loading states, and refresh from backend after submission
-5. Keep localStorage for users/outlets/session — do NOT change auth system
-6. Keep IndexedDB for image blobs — do NOT change image handling
+1. Generate PWA icon sizes (192x192 and 512x512) from the existing Oho Shawarma logo
+2. Create `public/manifest.json` with app name, icons, theme color (#361e14), background color
+3. Register a minimal service worker in `public/sw.js`
+4. Update `index.html` to link manifest and register SW
+5. In the audit form component, track `isDirty` state (set to true on first field change, false after successful submit)
+6. Use `beforeunload` event listener to intercept browser refresh
+7. Show a custom in-app modal (not browser default) with message and Ok/Cancel buttons — Ok proceeds with reload, Cancel stays on page

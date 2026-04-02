@@ -241,13 +241,16 @@ export default function AnalyticsPage() {
   const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
 
   useEffect(() => {
-    Promise.all([getAuditReports(), getAuditSubmissions()]).then(
-      ([reports, submissions]) => {
+    Promise.all([getAuditReports(), getAuditSubmissions()])
+      .then(([reports, submissions]) => {
         setAllReports(reports);
         setAllSubmissions(submissions);
         setLoading(false);
-      },
-    );
+      })
+      .catch((err) => {
+        console.error("Failed to load analytics data:", err);
+        setLoading(false);
+      });
   }, []);
 
   const outletOptions = useMemo(

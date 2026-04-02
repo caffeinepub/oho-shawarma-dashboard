@@ -42,10 +42,15 @@ export default function MyAuditReportsPage() {
   useEffect(() => {
     const session = getSession();
     if (session) {
-      getMyAuditSubmissions(session.userId).then((data) => {
-        setAudits(data);
-        setLoading(false);
-      });
+      getMyAuditSubmissions(session.userId)
+        .then((data) => {
+          setAudits(data);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Failed to load audit reports:", err);
+          setLoading(false);
+        });
     } else {
       setLoading(false);
     }

@@ -66,9 +66,9 @@ export default function SignaturePad({ label, onChange }: SignaturePadProps) {
     lastPos.current = pos;
     if (isEmpty) {
       setIsEmpty(false);
-      onChange(canvas.toDataURL("image/png"));
+      onChange(canvas.toDataURL("image/jpeg", 0.7));
     } else {
-      onChange(canvas.toDataURL("image/png"));
+      onChange(canvas.toDataURL("image/jpeg", 0.7));
     }
   }
 

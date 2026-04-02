@@ -43,7 +43,7 @@ import {
   Loader2,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type AnswerValue = "YES" | "NO" | "NA";
@@ -187,6 +187,10 @@ export default function StartAuditPage() {
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>([]);
 
+  // Dirty state tracking for refresh warning
+  const [isDirty, setIsDirty] = useState(false);
+  const [showRefreshWarning, setShowRefreshWarning] = useState(false);
+
   // Audit Summary state
   const [overallRemarks, setOverallRemarks] = useState("");
   const [auditorSignature, setAuditorSignature] = useState<string | undefined>(
@@ -210,12 +214,44 @@ export default function StartAuditPage() {
 
   const selectedOutlet = outlets.find((o) => o.id === selectedOutletId);
 
+  // beforeunload warning
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  // Intercept F5 / Ctrl+R / Cmd+R to show custom modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        isDirty &&
+        (e.key === "F5" || ((e.ctrlKey || e.metaKey) && e.key === "r"))
+      ) {
+        e.preventDefault();
+        setShowRefreshWarning(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isDirty]);
+
+  const markDirty = () => {
+    if (!isDirty) setIsDirty(true);
+  };
+
   const handleStartAudit = () => {
     if (!selectedOutletId) return;
     const defaultSections = createDefaultAuditSections();
     setSections(defaultSections);
     setOpenSections(defaultSections.map((s) => s.id));
     setStep(2);
+    markDirty();
   };
 
   const updateItemValue = (
@@ -241,6 +277,7 @@ export default function StartAuditPage() {
       next.delete(`${sectionId}:${itemId}`);
       return next;
     });
+    markDirty();
   };
 
   const updateItemRemarks = (
@@ -260,6 +297,7 @@ export default function StartAuditPage() {
           : s,
       ),
     );
+    markDirty();
   };
 
   const updateItemFollowUpAction = (
@@ -279,6 +317,7 @@ export default function StartAuditPage() {
           : s,
       ),
     );
+    markDirty();
   };
 
   const updateItemImage = (
@@ -298,6 +337,7 @@ export default function StartAuditPage() {
           : s,
       ),
     );
+    markDirty();
   };
 
   const compressImage = (file: File): Promise<string> => {
@@ -306,16 +346,27 @@ export default function StartAuditPage() {
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
+        const MAX = 1200;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height / width) * MAX);
+            width = MAX;
+          } else {
+            width = Math.round((width / height) * MAX);
+            height = MAX;
+          }
+        }
         const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           reject(new Error("Canvas not supported"));
           return;
         }
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
       };
       img.onerror = reject;
       img.src = url;
@@ -463,11 +514,13 @@ export default function StartAuditPage() {
         pestControlDate: pestControlDate || undefined,
       });
 
+      setIsDirty(false);
       toast.success(`Audit ${submission.auditId} submitted successfully!`);
       navigate({ to: "/audit-summary/$id", params: { id: submission.id } });
     } catch (err) {
       console.error("Submission failed:", err);
-      toast.error("Submission failed. Please try again.");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Submission failed: ${msg.slice(0, 120)}`);
     } finally {
       setSubmitting(false);
     }
@@ -492,7 +545,10 @@ export default function StartAuditPage() {
           <CardContent className="space-y-4">
             <Select
               value={selectedOutletId}
-              onValueChange={setSelectedOutletId}
+              onValueChange={(v) => {
+                setSelectedOutletId(v);
+                markDirty();
+              }}
             >
               <SelectTrigger data-ocid="start_audit.outlet.select">
                 <SelectValue placeholder="Choose an outlet..." />
@@ -526,6 +582,44 @@ export default function StartAuditPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Refresh Warning Modal */}
+      {showRefreshWarning && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          data-ocid="start_audit.refresh_warning.modal"
+        >
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-[#361e14] dark:text-white mb-2">
+              Leave page?
+            </h3>
+            <p className="text-sm text-[#361e14] dark:text-slate-300 mb-6">
+              If you refresh, data will be lost.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                data-ocid="start_audit.refresh_warning.cancel_button"
+                onClick={() => setShowRefreshWarning(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-[#361e14] dark:text-white hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-ocid="start_audit.refresh_warning.confirm_button"
+                onClick={() => {
+                  setShowRefreshWarning(false);
+                  window.location.reload();
+                }}
+                className="px-4 py-2 rounded-lg bg-[#fdbc0c] text-[#361e14] text-sm font-semibold hover:bg-[#e6a800] transition-colors"
+              >
+                Ok
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="font-display font-bold text-2xl">Audit Form</h2>
         <p className="text-muted-foreground text-sm mt-1">
@@ -715,13 +809,13 @@ export default function StartAuditPage() {
                           <Textarea
                             placeholder="Add remarks..."
                             value={item.remarks}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               updateItemRemarks(
                                 section.id,
                                 item.id,
                                 e.target.value,
-                              )
-                            }
+                              );
+                            }}
                             className="text-xs min-h-[60px] resize-none flex-1"
                             data-ocid="start_audit.item.textarea"
                           />
@@ -858,9 +952,10 @@ export default function StartAuditPage() {
                             <Input
                               type="date"
                               value={ductHoodServiceDate}
-                              onChange={(e) =>
-                                setDuctHoodServiceDate(e.target.value)
-                              }
+                              onChange={(e) => {
+                                setDuctHoodServiceDate(e.target.value);
+                                markDirty();
+                              }}
                               className={cn(
                                 "mt-1 max-w-xs",
                                 attemptedSubmit &&
@@ -879,9 +974,10 @@ export default function StartAuditPage() {
                             <Input
                               type="date"
                               value={waterFilterServiceDate}
-                              onChange={(e) =>
-                                setWaterFilterServiceDate(e.target.value)
-                              }
+                              onChange={(e) => {
+                                setWaterFilterServiceDate(e.target.value);
+                                markDirty();
+                              }}
                               className={cn(
                                 "mt-1 max-w-xs",
                                 attemptedSubmit &&
@@ -900,9 +996,10 @@ export default function StartAuditPage() {
                             <Input
                               type="date"
                               value={visicoolerServiceDate}
-                              onChange={(e) =>
-                                setVisicoolerServiceDate(e.target.value)
-                              }
+                              onChange={(e) => {
+                                setVisicoolerServiceDate(e.target.value);
+                                markDirty();
+                              }}
                               className={cn(
                                 "mt-1 max-w-xs",
                                 attemptedSubmit &&
@@ -921,9 +1018,10 @@ export default function StartAuditPage() {
                             <Input
                               type="date"
                               value={deepFreezerServiceDate}
-                              onChange={(e) =>
-                                setDeepFreezerServiceDate(e.target.value)
-                              }
+                              onChange={(e) => {
+                                setDeepFreezerServiceDate(e.target.value);
+                                markDirty();
+                              }}
                               className={cn(
                                 "mt-1 max-w-xs",
                                 attemptedSubmit &&
@@ -943,9 +1041,10 @@ export default function StartAuditPage() {
                             <Input
                               type="date"
                               value={fireExtExpiryDate}
-                              onChange={(e) =>
-                                setFireExtExpiryDate(e.target.value)
-                              }
+                              onChange={(e) => {
+                                setFireExtExpiryDate(e.target.value);
+                                markDirty();
+                              }}
                               className="mt-1 max-w-xs"
                               data-ocid="start_audit.fire_ext_expiry.input"
                             />
@@ -978,7 +1077,10 @@ export default function StartAuditPage() {
             <Input
               type="date"
               value={pestControlDate}
-              onChange={(e) => setPestControlDate(e.target.value)}
+              onChange={(e) => {
+                setPestControlDate(e.target.value);
+                markDirty();
+              }}
               className={cn(
                 "max-w-xs",
                 attemptedSubmit &&
@@ -1032,7 +1134,10 @@ export default function StartAuditPage() {
               id="overall-remarks"
               placeholder="Write general comments about the outlet..."
               value={overallRemarks}
-              onChange={(e) => setOverallRemarks(e.target.value)}
+              onChange={(e) => {
+                setOverallRemarks(e.target.value);
+                markDirty();
+              }}
               className="min-h-[120px] resize-none"
               data-ocid="audit_summary.overall_remarks.textarea"
             />
@@ -1044,7 +1149,10 @@ export default function StartAuditPage() {
             <div data-ocid="audit_summary.auditor_signature.canvas_target">
               <SignaturePad
                 label="Auditor Signature *"
-                onChange={setAuditorSignature}
+                onChange={(sig) => {
+                  setAuditorSignature(sig);
+                  markDirty();
+                }}
               />
               <p
                 className="text-sm font-medium mt-2"
@@ -1060,7 +1168,10 @@ export default function StartAuditPage() {
             >
               <SignaturePad
                 label="Manager Signature *"
-                onChange={setManagerSignature}
+                onChange={(sig) => {
+                  setManagerSignature(sig);
+                  markDirty();
+                }}
               />
               <div className="space-y-1 mt-2">
                 <Label htmlFor="manager-name-input">Manager Name</Label>
@@ -1069,14 +1180,17 @@ export default function StartAuditPage() {
                   data-ocid="audit_summary.manager_name.input"
                   placeholder="Enter manager name"
                   value={managerName}
-                  onChange={(e) => setManagerName(e.target.value)}
+                  onChange={(e) => {
+                    setManagerName(e.target.value);
+                    markDirty();
+                  }}
                 />
               </div>
             </div>
           </div>
 
           {/* Date Picker */}
-          <div className="space-y-2 max-w-xs">
+          <div className="space-y-2 w-full max-w-sm">
             <Label>Date</Label>
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
@@ -1094,11 +1208,11 @@ export default function StartAuditPage() {
                   {auditDate ? auditDate : "Pick a date"}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-2" align="start">
+              <PopoverContent className="w-[320px] p-3" align="start">
                 <Calendar
                   mode="single"
                   className="rounded-md border"
-                  style={{ ["--cell-size" as string]: "2.25rem" }}
+                  style={{ ["--cell-size" as string]: "2.75rem" }}
                   selected={selectedDate}
                   onSelect={(date) => {
                     setSelectedDate(date);
@@ -1110,6 +1224,7 @@ export default function StartAuditPage() {
                       );
                       const year = date.getFullYear();
                       setAuditDate(`${day}/${month}/${year}`);
+                      markDirty();
                     }
                     setDatePickerOpen(false);
                   }}

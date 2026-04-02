@@ -89,18 +89,25 @@ export default function AuditReportsPage() {
   const [showExpiryModal, setShowExpiryModal] = useState(false);
 
   useEffect(() => {
-    Promise.all([getAuditReports(), getAuditSubmissions()]).then(
-      ([reportData, submissionData]) => {
+    Promise.all([getAuditReports(), getAuditSubmissions()])
+      .then(([reportData, submissionData]) => {
         setReports(reportData);
         setAllSubmissions(submissionData);
         setLoading(false);
-      },
-    );
+      })
+      .catch((err) => {
+        console.error("Failed to load audit reports:", err);
+        setLoading(false);
+      });
   }, []);
 
   const refresh = () => {
-    getAuditReports().then(setReports);
-    getAuditSubmissions().then(setAllSubmissions);
+    getAuditReports()
+      .then(setReports)
+      .catch(() => {});
+    getAuditSubmissions()
+      .then(setAllSubmissions)
+      .catch(() => {});
   };
 
   const hasSampleData = reports.some((r) => r.isSample);

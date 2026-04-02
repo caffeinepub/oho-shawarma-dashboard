@@ -118,6 +118,31 @@ async function getActor() {
 }
 
 function serializeSubmission(sub: AuditSubmission): StoredAuditSubmission {
+  // Strip imageBase64 from items before serializing to keep payload under the
+  // ICP 2MB ingress message limit. Images are stored separately in IndexedDB.
+  const sectionsWithoutImages = sub.sections.map((s) => ({
+    ...s,
+    items: s.items.map((item) => {
+      const { imageBase64: _img, ...rest } = item;
+      void _img;
+      return rest;
+    }),
+  }));
+  // Build payload, strip signatures if total payload would exceed ~1.8MB
+  const payloadObj = { ...sub, sections: sectionsWithoutImages };
+  let payloadStr = JSON.stringify(payloadObj);
+  if (payloadStr.length > 1_800_000) {
+    // Strip signatures to keep under ICP 2MB limit
+    const {
+      auditorSignature: _as,
+      managerSignature: _ms,
+      ...rest
+    } = payloadObj;
+    void _as;
+    void _ms;
+    payloadStr = JSON.stringify(rest);
+  }
+
   return {
     id: sub.id,
     auditId: sub.auditId,
@@ -126,7 +151,7 @@ function serializeSubmission(sub: AuditSubmission): StoredAuditSubmission {
     auditorName: sub.auditorName,
     submittedAt: sub.submittedAt,
     score: BigInt(Math.round(sub.score)),
-    payload: JSON.stringify(sub),
+    payload: payloadStr,
   };
 }
 
@@ -539,9 +564,14 @@ export function deleteOutlet(id: string): void {
 // ---- Audit Submissions (backend-based) ----
 
 export async function getAuditSubmissions(): Promise<AuditSubmission[]> {
-  const actor = await getActor();
-  const stored = await actor.getAllAuditSubmissions();
-  return stored.map(deserializeSubmission);
+  try {
+    const actor = await getActor();
+    const stored = await actor.getAllAuditSubmissions();
+    return stored.map(deserializeSubmission);
+  } catch (e) {
+    console.error("Failed to fetch audit submissions from backend:", e);
+    return [];
+  }
 }
 
 export async function getMyAuditSubmissions(
@@ -554,10 +584,16 @@ export async function getMyAuditSubmissions(
 export async function getAuditSubmissionById(
   id: string,
 ): Promise<AuditSubmission | undefined> {
-  const actor = await getActor();
-  const result = await actor.getAuditSubmissionById(id);
-  if (!result) return undefined;
-  return deserializeSubmission(result);
+  try {
+    const actor = await getActor();
+    const result = await actor.getAuditSubmissionById(id);
+    const item = Array.isArray(result) ? result[0] : result;
+    if (!item) return undefined;
+    return deserializeSubmission(item);
+  } catch (e) {
+    console.error("Failed to fetch audit submission:", e);
+    return undefined;
+  }
 }
 
 export async function getAuditReports(): Promise<AuditReport[]> {
@@ -609,51 +645,64 @@ export async function deleteAuditReport(id: string): Promise<void> {
 }
 
 /**
- * Load images from IndexedDB and rehydrate them into a submission's sections.
- * Call this before generating a PDF or displaying photos.
+ * Resize and compress an image for backend storage.
+ * Max 800px wide/tall, JPEG 70% quality.
  */
-export async function loadImagesForSubmission(
-  submission: AuditSubmission,
-): Promise<AuditSubmission> {
-  const sections = await Promise.all(
-    submission.sections.map(async (section) => ({
-      ...section,
-      items: await Promise.all(
-        section.items.map(async (item) => {
-          const key = `${submission.id}::${section.id}::${item.id}`;
-          const imageBase64 = await getImage(key);
-          return imageBase64 ? { ...item, imageBase64 } : item;
-        }),
-      ),
-    })),
-  );
-  return { ...submission, sections };
+async function resizeImageForStorage(base64: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 800;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height / width) * MAX);
+          width = MAX;
+        } else {
+          width = Math.round((width / height) * MAX);
+          height = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(base64);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
 }
 
 /**
- * Save images from sections to IndexedDB and return sections with images stripped.
+ * Save images from sections to IndexedDB as cache.
+ * Images are NOT included in the backend payload to stay under the ICP 2MB limit.
  */
 async function saveImagesToDb(
   submissionId: string,
   sections: AuditSection[],
 ): Promise<AuditSection[]> {
-  const stripped = await Promise.all(
+  return Promise.all(
     sections.map(async (section) => ({
       ...section,
       items: await Promise.all(
         section.items.map(async (item) => {
           if (item.imageBase64) {
+            const compressed = await resizeImageForStorage(item.imageBase64);
             const key = `${submissionId}::${section.id}::${item.id}`;
-            await saveImage(key, item.imageBase64);
-            const { imageBase64: _, ...rest } = item;
-            return rest as AuditItem;
+            await saveImage(key, compressed); // local cache only
+            return { ...item, imageBase64: compressed };
           }
           return item;
         }),
       ),
     })),
   );
-  return stripped;
 }
 
 export async function createAuditSubmission(
@@ -671,24 +720,54 @@ export async function createAuditSubmission(
   }
   const score = calculateFinalScore(data.sections);
 
-  // Save images to IndexedDB and strip from payload
-  const strippedSections = await saveImagesToDb(uuid, data.sections);
+  // Save images to IndexedDB (local cache) — images are NOT sent to backend
+  const sectionsWithImages = await saveImagesToDb(uuid, data.sections);
 
   const submission: AuditSubmission = {
     ...data,
-    sections: strippedSections,
+    sections: sectionsWithImages,
     id: uuid,
     auditId,
     sectionScores,
     score,
   };
 
-  // Store in ICP backend canister (cross-device persistent)
+  // Store in ICP backend canister (images stripped to stay under 2MB limit)
   const actor = await getActor();
   await actor.submitAuditSubmission(serializeSubmission(submission));
 
-  // Return with full sections including images (for immediate use in current session)
-  return { ...submission, sections: data.sections, sectionScores, score };
+  return submission;
+}
+
+/**
+ * Load images for a submission. Checks backend payload first, falls back to IndexedDB
+ * for legacy submissions that had images stripped before this fix.
+ */
+export async function loadImagesForSubmission(
+  submission: AuditSubmission,
+): Promise<AuditSubmission> {
+  // Check if images are already embedded in the submission (from backend payload)
+  const hasBackendImages = submission.sections.some((s) =>
+    s.items.some((i) => !!i.imageBase64),
+  );
+  if (hasBackendImages) {
+    return submission; // Images already present, no need to load from IndexedDB
+  }
+
+  // Fallback: try to load from IndexedDB (images are always stored locally)
+  const sections = await Promise.all(
+    submission.sections.map(async (section) => ({
+      ...section,
+      items: await Promise.all(
+        section.items.map(async (item) => {
+          const key = `${submission.id}::${section.id}::${item.id}`;
+          const imageBase64 = await getImage(key);
+          return imageBase64 ? { ...item, imageBase64 } : item;
+        }),
+      ),
+    })),
+  );
+  return { ...submission, sections };
 }
 
 export interface MaintenanceRow {

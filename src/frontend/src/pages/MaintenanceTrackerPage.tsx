@@ -8,10 +8,15 @@ export default function MaintenanceTrackerPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getMaintenanceTrackerData().then((data) => {
-      setMaintenanceData(data);
-      setLoading(false);
-    });
+    getMaintenanceTrackerData()
+      .then((data) => {
+        setMaintenanceData(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load maintenance data:", err);
+        setLoading(false);
+      });
   }, []);
 
   return (
