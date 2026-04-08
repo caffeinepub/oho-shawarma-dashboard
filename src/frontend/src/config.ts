@@ -177,3 +177,22 @@ export async function createActorWithConfig(
     actorOptions,
   );
 }
+
+// Singleton StorageClient for direct image uploads
+let _storageClient: StorageClient | null = null;
+export async function getStorageClient(): Promise<StorageClient> {
+  if (_storageClient) return _storageClient;
+  const config = await loadConfig();
+  const agent = new HttpAgent({ host: config.backend_host });
+  if (config.backend_host?.includes("localhost")) {
+    await agent.fetchRootKey().catch(() => {});
+  }
+  _storageClient = new StorageClient(
+    config.bucket_name,
+    config.storage_gateway_url,
+    config.backend_canister_id,
+    config.project_id,
+    agent,
+  );
+  return _storageClient;
+}

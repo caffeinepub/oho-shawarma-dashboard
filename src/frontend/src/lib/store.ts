@@ -53,6 +53,7 @@ export interface AuditItem {
   remarks: string;
   followUpAction?: string;
   imageBase64?: string;
+  imageUrl?: string;
 }
 
 export interface AuditSection {
@@ -79,7 +80,7 @@ export interface AuditSubmission {
   auditorSignature?: string;
   managerSignature?: string;
   managerName?: string;
-  auditDate?: string;
+  auditDate?: string; // kept for backward compat with old records
   fireExtinguisherExpiryDate?: string;
   ductHoodLastServiceDate?: string;
   waterFilterLastServiceDate?: string;
@@ -119,13 +120,13 @@ async function getActor() {
 
 function serializeSubmission(sub: AuditSubmission): StoredAuditSubmission {
   // Strip imageBase64 from items before serializing to keep payload under the
-  // ICP 2MB ingress message limit. Images are stored separately in IndexedDB.
+  // ICP 2MB ingress message limit. imageUrl (blob storage URL) is kept.
   const sectionsWithoutImages = sub.sections.map((s) => ({
     ...s,
     items: s.items.map((item) => {
       const { imageBase64: _img, ...rest } = item;
       void _img;
-      return rest;
+      return rest; // imageUrl is preserved in rest
     }),
   }));
   // Build payload, strip signatures if total payload would exceed ~1.8MB
@@ -602,7 +603,7 @@ export async function getAuditReports(): Promise<AuditReport[]> {
     id: sub.id,
     outletName: sub.outletName,
     auditorName: sub.auditorName,
-    date: sub.auditDate || sub.submittedAt.slice(0, 10),
+    date: sub.submittedAt.slice(0, 10),
     score: sub.score,
     status: (sub.score >= 70 ? "pass" : "fail") as "pass" | "fail" | "pending",
     notes: `Audit ${sub.auditId}`,
@@ -616,7 +617,7 @@ export async function getMaintenanceTrackerData(): Promise<MaintenanceRow[]> {
   const submissions = await getAuditSubmissions();
   const rows: MaintenanceRow[] = submissions.map((s) => ({
     outletName: s.outletName,
-    auditDate: s.auditDate || s.submittedAt?.slice(0, 10) || undefined,
+    auditDate: s.submittedAt?.slice(0, 10) || undefined,
     fireExtinguisherExpiryDate: s.fireExtinguisherExpiryDate || undefined,
     ductHoodLastServiceDate: s.ductHoodLastServiceDate || undefined,
     waterFilterLastServiceDate: s.waterFilterLastServiceDate || undefined,
@@ -680,8 +681,8 @@ async function resizeImageForStorage(base64: string): Promise<string> {
 }
 
 /**
- * Save images from sections to IndexedDB as cache.
- * Images are NOT included in the backend payload to stay under the ICP 2MB limit.
+ * Save images from sections to IndexedDB as local cache.
+ * Images are NOT included in the backend payload.
  */
 async function saveImagesToDb(
   submissionId: string,
@@ -732,7 +733,7 @@ export async function createAuditSubmission(
     score,
   };
 
-  // Store in ICP backend canister (images stripped to stay under 2MB limit)
+  // Store in ICP backend canister (imageBase64 stripped, imageUrl preserved)
   const actor = await getActor();
   await actor.submitAuditSubmission(serializeSubmission(submission));
 
@@ -740,21 +741,21 @@ export async function createAuditSubmission(
 }
 
 /**
- * Load images for a submission. Checks backend payload first, falls back to IndexedDB
- * for legacy submissions that had images stripped before this fix.
+ * Load images for a submission. Checks imageUrl (blob storage) first,
+ * then imageBase64 in payload, then falls back to IndexedDB for legacy submissions.
  */
 export async function loadImagesForSubmission(
   submission: AuditSubmission,
 ): Promise<AuditSubmission> {
-  // Check if images are already embedded in the submission (from backend payload)
-  const hasBackendImages = submission.sections.some((s) =>
-    s.items.some((i) => !!i.imageBase64),
+  // Check if images are already embedded or have blob URLs
+  const hasImages = submission.sections.some((s) =>
+    s.items.some((i) => !!i.imageBase64 || !!i.imageUrl),
   );
-  if (hasBackendImages) {
-    return submission; // Images already present, no need to load from IndexedDB
+  if (hasImages) {
+    return submission;
   }
 
-  // Fallback: try to load from IndexedDB (images are always stored locally)
+  // Fallback: try to load from IndexedDB (images stored locally on this device)
   const sections = await Promise.all(
     submission.sections.map(async (section) => ({
       ...section,

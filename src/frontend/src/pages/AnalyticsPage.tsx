@@ -292,7 +292,7 @@ export default function AnalyticsPage() {
   const filteredSubmissions = useMemo(
     () =>
       allSubmissions.filter((s) => {
-        const date = s.auditDate || s.submittedAt?.slice(0, 10);
+        const date = s.submittedAt?.slice(0, 10);
         if (filterOutlet !== "all" && s.outletName !== filterOutlet)
           return false;
         if (filterAuditor !== "all" && s.auditorName !== filterAuditor)
@@ -426,7 +426,7 @@ export default function AnalyticsPage() {
   const trendData = useMemo(() => {
     const dayMap: Record<string, { total: number; count: number }> = {};
     for (const s of filteredSubmissions) {
-      const rawDay = s.auditDate || s.submittedAt?.slice(0, 10);
+      const rawDay = s.submittedAt?.slice(0, 10);
       const day = toISODate(rawDay);
       if (!day) continue;
       if (!dayMap[day]) dayMap[day] = { total: 0, count: 0 };

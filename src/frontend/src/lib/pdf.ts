@@ -399,6 +399,21 @@ function drawAnalyticsSummaryPage(
   }
 }
 
+async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function generateAuditPDF(
   submission: AuditSubmission,
 ): Promise<void> {
@@ -459,10 +474,8 @@ export async function generateAuditPDF(
     { label: "Outlet", value: submission.outletName },
     { label: "Auditor", value: submission.auditorName },
     {
-      label: "Audit Date",
-      value:
-        submission.auditDate ||
-        new Date(submission.submittedAt).toLocaleDateString("en-IN"),
+      label: "Submitted",
+      value: new Date(submission.submittedAt).toLocaleDateString("en-IN"),
     },
   ];
 
@@ -601,7 +614,7 @@ export async function generateAuditPDF(
     for (const item of section.items) {
       const isNaValue = item.value === "NA";
       const isStarItem = section.isStarRating && typeof item.value === "number";
-      const hasImage = !!item.imageBase64;
+      const hasImage = !!item.imageBase64 || !!item.imageUrl;
       // Follow-up: star sections ≤3 stars, YES/NO/NA sections when NO
       const hasFollowUp = section.isStarRating
         ? isStarItem && (item.value as number) <= 3 && !!item.followUpAction
@@ -793,30 +806,33 @@ export async function generateAuditPDF(
       }
 
       // Image — preserve original aspect ratio, 25% of content width
-      if (hasImage && item.imageBase64) {
+      if (hasImage) {
         try {
-          const fmt = item.imageBase64.startsWith("data:image/png")
-            ? "PNG"
-            : "JPEG";
-          const dims = await getImageDimensions(item.imageBase64);
-          let displayW = IMG_MAX_W;
-          let displayH = (dims.height / dims.width) * displayW;
-          if (displayH > IMG_MAX_H) {
-            displayH = IMG_MAX_H;
-            displayW = (dims.width / dims.height) * displayH;
+          const imgData = item.imageUrl
+            ? ((await fetchImageAsDataUrl(item.imageUrl)) ?? item.imageBase64)
+            : item.imageBase64;
+          if (imgData) {
+            const fmt = imgData.startsWith("data:image/png") ? "PNG" : "JPEG";
+            const dims = await getImageDimensions(imgData);
+            let displayW = IMG_MAX_W;
+            let displayH = (dims.height / dims.width) * displayW;
+            if (displayH > IMG_MAX_H) {
+              displayH = IMG_MAX_H;
+              displayW = (dims.width / dims.height) * displayH;
+            }
+            y = checkPageBreak(doc, y, displayH + 5, pageNum);
+            doc.addImage(
+              imgData,
+              fmt,
+              MARGIN + 2,
+              y,
+              displayW,
+              displayH,
+              undefined,
+              "FAST",
+            );
+            y += displayH + 3;
           }
-          y = checkPageBreak(doc, y, displayH + 5, pageNum);
-          doc.addImage(
-            item.imageBase64,
-            fmt,
-            MARGIN + 2,
-            y,
-            displayW,
-            displayH,
-            undefined,
-            "FAST",
-          );
-          y += displayH + 3;
         } catch {
           // skip image on error
         }
@@ -970,14 +986,23 @@ export async function generateAuditPDF(
 
   y += sigH + 8;
 
-  // Audit Date
-  if (submission.auditDate) {
-    y = checkPageBreak(doc, y, 10, pageNum);
+  // Submitted date
+  {
+    const ROW_H = 8;
+    y = checkPageBreak(doc, y, ROW_H + 2, pageNum);
+    doc.setFillColor(248, 248, 248);
+    doc.rect(MARGIN, y, PAGE_WIDTH - 2 * MARGIN, ROW_H, "F");
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(60, 60, 60);
-    doc.text(`Audit Date: ${submission.auditDate}`, MARGIN + 2, y + 5);
-    y += 10;
+    doc.setTextColor(38, 40, 59);
+    doc.text("Submitted:", MARGIN + 2, y + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      new Date(submission.submittedAt).toLocaleDateString("en-IN"),
+      MARGIN + 22,
+      y + 5,
+    );
+    y += ROW_H + 2;
   }
 
   // Footer brand line

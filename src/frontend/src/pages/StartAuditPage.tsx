@@ -7,15 +7,9 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -25,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getStorageClient } from "@/config";
 import {
   type AuditSection,
   calculateFinalScore,
@@ -36,13 +31,7 @@ import {
 } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  CalendarIcon,
-  CheckCircle2,
-  ImagePlus,
-  Loader2,
-  X,
-} from "lucide-react";
+import { CheckCircle2, ImagePlus, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -171,6 +160,50 @@ function StarRating({
   );
 }
 
+// Compress image to max maxBytes size, reducing quality iteratively
+const compressImageToLimit = (
+  file: File,
+  maxBytes: number,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX_DIM = 1200;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width > height) {
+          height = Math.round((height / width) * MAX_DIM);
+          width = MAX_DIM;
+        } else {
+          width = Math.round((width / height) * MAX_DIM);
+          height = MAX_DIM;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas not supported"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      let quality = 0.85;
+      let result = canvas.toDataURL("image/jpeg", quality);
+      // Reduce quality until under maxBytes (base64 is ~1.37x raw size)
+      while (result.length * 0.75 > maxBytes && quality > 0.1) {
+        quality -= 0.1;
+        result = canvas.toDataURL("image/jpeg", quality);
+      }
+      resolve(result);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+};
+
 export default function StartAuditPage() {
   const navigate = useNavigate();
   const session = getSession();
@@ -191,6 +224,11 @@ export default function StartAuditPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [showRefreshWarning, setShowRefreshWarning] = useState(false);
 
+  // Image upload tracking
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Audit Summary state
   const [overallRemarks, setOverallRemarks] = useState("");
   const [auditorSignature, setAuditorSignature] = useState<string | undefined>(
@@ -200,17 +238,12 @@ export default function StartAuditPage() {
     undefined,
   );
   const [managerName, setManagerName] = useState("");
-  const today = new Date();
-  const todayFormatted = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
-  const [auditDate, setAuditDate] = useState(todayFormatted);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [fireExtExpiryDate, setFireExtExpiryDate] = useState("");
   const [ductHoodServiceDate, setDuctHoodServiceDate] = useState("");
   const [waterFilterServiceDate, setWaterFilterServiceDate] = useState("");
   const [visicoolerServiceDate, setVisicoolerServiceDate] = useState("");
   const [deepFreezerServiceDate, setDeepFreezerServiceDate] = useState("");
   const [pestControlDate, setPestControlDate] = useState("");
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(today);
 
   const selectedOutlet = outlets.find((o) => o.id === selectedOutletId);
 
@@ -340,37 +373,23 @@ export default function StartAuditPage() {
     markDirty();
   };
 
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const MAX = 1200;
-        let { width, height } = img;
-        if (width > MAX || height > MAX) {
-          if (width > height) {
-            height = Math.round((height / width) * MAX);
-            width = MAX;
-          } else {
-            width = Math.round((width / height) * MAX);
-            height = MAX;
-          }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Canvas not supported"));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.8));
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
+  const updateItemImageUrl = (
+    sectionId: string,
+    itemId: string,
+    imageUrl: string | undefined,
+  ) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              items: s.items.map((item) =>
+                item.id === itemId ? { ...item, imageUrl } : item,
+              ),
+            }
+          : s,
+      ),
+    );
   };
 
   const handleImageUpload = async (
@@ -378,9 +397,43 @@ export default function StartAuditPage() {
     itemId: string,
     file: File,
   ) => {
+    const imgKey = `${sectionId}:${itemId}`;
     try {
-      const compressed = await compressImage(file);
-      updateItemImage(sectionId, itemId, compressed);
+      // Step 1: compress to max 1000KB
+      const base64 = await compressImageToLimit(file, 1000 * 1024);
+      // Step 2: set local preview immediately
+      updateItemImage(sectionId, itemId, base64);
+      markDirty();
+
+      // Step 3: async upload to blob storage
+      setUploadingImages((prev) => new Set([...prev, imgKey]));
+      try {
+        const storageClient = await getStorageClient();
+        // Convert base64 to bytes
+        const base64Data = base64.split(",")[1];
+        const binaryStr = atob(base64Data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const { hash } = await storageClient.putFile(bytes);
+        const url = await storageClient.getDirectURL(hash);
+        updateItemImageUrl(sectionId, itemId, url);
+      } catch (uploadErr) {
+        console.warn(
+          "Image upload to storage failed, using local only:",
+          uploadErr,
+        );
+        toast("Image saved locally. May not appear on other devices.", {
+          icon: "⚠️",
+        });
+      } finally {
+        setUploadingImages((prev) => {
+          const s = new Set(prev);
+          s.delete(imgKey);
+          return s;
+        });
+      }
     } catch {
       toast.error("Failed to process image. Please try another photo.");
     }
@@ -454,7 +507,6 @@ export default function StartAuditPage() {
     }
 
     const summaryMissing: string[] = [];
-    if (!auditDate) summaryMissing.push("• Audit Date");
     if (!overallRemarks.trim()) summaryMissing.push("• Overall Remarks");
     if (!auditorSignature) summaryMissing.push("• Auditor Signature");
     if (!managerSignature) summaryMissing.push("• Manager Signature");
@@ -505,7 +557,6 @@ export default function StartAuditPage() {
         auditorSignature,
         managerSignature,
         managerName,
-        auditDate,
         fireExtinguisherExpiryDate: fireExtExpiryDate,
         ductHoodLastServiceDate: ductHoodServiceDate || undefined,
         waterFilterLastServiceDate: waterFilterServiceDate || undefined,
@@ -740,7 +791,8 @@ export default function StartAuditPage() {
               <AccordionContent className="px-0 pb-0">
                 <div className="divide-y">
                   {section.items.map((item) => {
-                    const imgKey = `${section.id}-${item.id}`;
+                    const imgKey = `${section.id}:${item.id}`;
+                    const fileInputKey = `${section.id}-${item.id}`;
                     const showStarFollowUp =
                       section.isStarRating &&
                       typeof item.value === "number" &&
@@ -748,6 +800,7 @@ export default function StartAuditPage() {
                     const itemMissing = missingKeys.has(
                       `${section.id}:${item.id}`,
                     );
+                    const isUploading = uploadingImages.has(imgKey);
                     return (
                       <div
                         key={item.id}
@@ -825,7 +878,7 @@ export default function StartAuditPage() {
                               accept="image/*"
                               className="hidden"
                               ref={(el) => {
-                                fileInputRefs.current[imgKey] = el;
+                                fileInputRefs.current[fileInputKey] = el;
                               }}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
@@ -840,15 +893,46 @@ export default function StartAuditPage() {
                                   alt="Upload preview"
                                   className="w-14 h-14 object-cover rounded-md border"
                                 />
+                                {/* Upload progress overlay */}
+                                {isUploading && (
+                                  <div className="absolute inset-0 bg-black/40 rounded-md flex items-center justify-center">
+                                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                                  </div>
+                                )}
+                                {/* Uploaded checkmark overlay */}
+                                {!isUploading && item.imageUrl && (
+                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                    <svg
+                                      viewBox="0 0 10 10"
+                                      className="w-2.5 h-2.5 text-white"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.5"
+                                      aria-label="Uploaded"
+                                      role="img"
+                                    >
+                                      <path
+                                        d="M2 5l2 2 4-4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                  </div>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={() =>
+                                  onClick={() => {
                                     updateItemImage(
                                       section.id,
                                       item.id,
                                       undefined,
-                                    )
-                                  }
+                                    );
+                                    updateItemImageUrl(
+                                      section.id,
+                                      item.id,
+                                      undefined,
+                                    );
+                                  }}
                                   className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
                                   data-ocid="start_audit.item.delete_button"
                                 >
@@ -860,7 +944,7 @@ export default function StartAuditPage() {
                                 type="button"
                                 data-ocid="start_audit.item.upload_button"
                                 onClick={() =>
-                                  fileInputRefs.current[imgKey]?.click()
+                                  fileInputRefs.current[fileInputKey]?.click()
                                 }
                                 className="w-14 h-14 rounded-md border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 flex items-center justify-center transition-all"
                                 title="Upload image"
@@ -1189,49 +1273,10 @@ export default function StartAuditPage() {
             </div>
           </div>
 
-          {/* Date Picker */}
-          <div className="space-y-2 w-full max-w-sm">
-            <Label>Date</Label>
-            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  data-ocid="audit_summary.date.input"
-                  className={cn(
-                    "w-full flex items-center justify-start gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                    attemptedSubmit &&
-                      !auditDate &&
-                      "border-red-500 bg-red-50 dark:bg-red-950/20",
-                  )}
-                >
-                  <CalendarIcon className="h-4 w-4 shrink-0" />
-                  {auditDate ? auditDate : "Pick a date"}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[320px] p-3" align="start">
-                <Calendar
-                  mode="single"
-                  className="rounded-md border"
-                  style={{ ["--cell-size" as string]: "2.75rem" }}
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                    if (date) {
-                      const day = String(date.getDate()).padStart(2, "0");
-                      const month = String(date.getMonth() + 1).padStart(
-                        2,
-                        "0",
-                      );
-                      const year = date.getFullYear();
-                      setAuditDate(`${day}/${month}/${year}`);
-                      markDirty();
-                    }
-                    setDatePickerOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+          {/* Submission timestamp note */}
+          <div className="text-xs text-muted-foreground bg-muted/40 rounded-md px-3 py-2 border">
+            <span className="font-medium">Submission date</span> will be
+            automatically recorded when you submit.
           </div>
         </CardContent>
       </Card>
